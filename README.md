@@ -1,5 +1,3 @@
-Based on the provided code for the FinTrack project, here’s a revised checklist that addresses specific tasks and improvements required to complete the project:
-
 # FinTrack Project README
 
 ## Overview
