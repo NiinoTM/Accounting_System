@@ -1,6 +1,9 @@
 from PySide6.QtWidgets import QMessageBox, QMenu
 from PySide6.QtGui import QAction
 
+#modules
+from utils.crud import CRUD
+
 class CategoriesActions:
     def __init__(self, main_window):
         self.main_window = main_window
@@ -18,7 +21,7 @@ class CategoriesActions:
 
         # Connect actions to their respective methods
         create_categories.triggered.connect(self.create_categories)
-        read_categories.triggered.connect(self.read_categoriess)
+        read_categories.triggered.connect(self.read_categories)
         update_categories.triggered.connect(self.update_categories)
         delete_categories.triggered.connect(self.delete_categories)
 
@@ -31,13 +34,17 @@ class CategoriesActions:
         return categories_menu
 
     def create_categories(self):
-        QMessageBox.information(self.main_window, "Create categories", "Create a new categories.")
-    
-    def read_categoriess(self):
-        QMessageBox.information(self.main_window, "Read categories", "Display list of categoriess.")
-    
+        crud = CRUD("categories")
+        crud.create(self.main_window)
+
+    def read_categories(self):
+        crud = CRUD("categories")
+        crud.read(self.main_window)
+
     def update_categories(self):
-        QMessageBox.information(self.main_window, "Update categories", "Update an existing categories.")
-    
+        crud = CRUD("categories")
+        crud.edit(self.main_window)
+
     def delete_categories(self):
-        QMessageBox.information(self.main_window, "Delete categories", "Delete an categories.")
+        crud = CRUD("categories")
+        crud.delete(self.main_window)

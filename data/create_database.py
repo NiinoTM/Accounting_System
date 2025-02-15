@@ -49,6 +49,17 @@ def create_database():
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- Accounting Periods
+    CREATE TABLE IF NOT EXISTS accounting_periods (
+        id INTEGER PRIMARY KEY,
+        name VARCHAR(100) NOT NULL UNIQUE,
+        start_date DATE NOT NULL,
+        end_date DATE NOT NULL,
+        status VARCHAR(20) DEFAULT 'OPEN',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
     -- Debts and Credits
     CREATE TABLE IF NOT EXISTS debt_credit_records (
         id INTEGER PRIMARY KEY,
