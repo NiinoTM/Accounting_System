@@ -116,5 +116,3 @@ This project is licensed under the MIT License. See the LICENSE file for details
 
 ## Acknowledgments
 - Thanks to the open-source community for providing the tools and libraries that made this project possible. 
-
-This checklist focuses on specific areas that need attention based on the provided code, ensuring a more structured approach to completing the project.
