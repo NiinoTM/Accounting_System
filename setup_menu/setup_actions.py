@@ -12,19 +12,14 @@ class SetupActions:
         self.main_window = main_window
         self.setup_actions = {}
         self.action_handlers = {
-            'categories': CategoriesAction(main_window),
             'accounts': AccountsAction(main_window),
-            'accounting_periods': AccountingPeriodsAction(main_window)
+            'accounting_periods': AccountingPeriodsAction(main_window),
+            'categories': CategoriesAction(main_window)
         }
         self.create_setup_actions()
 
     def create_setup_actions(self):
-        # Categories
-        self.setup_actions['categories'] = QAction("Categories", self.main_window)
-        self.setup_actions['categories'].triggered.connect(
-            self.action_handlers['categories'].execute
-        )
-        
+            # ORDER OF SETUP MENU DISPLAY:
         # Accounts
         self.setup_actions['accounts'] = QAction("Accounts", self.main_window)
         self.setup_actions['accounts'].triggered.connect(
@@ -35,6 +30,12 @@ class SetupActions:
         self.setup_actions['accounting_periods'] = QAction("Accounting Periods", self.main_window)
         self.setup_actions['accounting_periods'].triggered.connect(
             self.action_handlers['accounting_periods'].execute
+        )
+
+        # Categories
+        self.setup_actions['categories'] = QAction("Categories", self.main_window)
+        self.setup_actions['categories'].triggered.connect(
+            self.action_handlers['categories'].execute
         )
 
     def add_setup_actions_to_menu(self, setup_menu):
