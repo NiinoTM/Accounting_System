@@ -1,12 +1,16 @@
 #libraries
-from PySide6.QtWidgets import QMainWindow, QFileDialog, QMessageBox
-from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QMainWindow
+
+#modules
+from setup_menu.setup_actions import SetupActions
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.setup_actions = SetupActions(self)
         self.init_ui()
         self.create_menu()
+
 
     def init_ui(self):
         self.setWindowTitle("FinTrack")
@@ -17,6 +21,8 @@ class MainWindow(QMainWindow):
         
         # Menu Options
         setup_menu = menubar.addMenu("Setup")
+        self.setup_actions.add_setup_actions_to_menu(setup_menu)
+
         transactions_menu = menubar.addMenu("Transactions")
         templates_menu = menubar.addMenu("Templates")
         reports_menu = menubar.addMenu("Reports")
