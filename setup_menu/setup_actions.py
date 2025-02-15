@@ -1,31 +1,28 @@
-# libraries
-from PySide6.QtWidgets import QMessageBox
+# setup_actions.py
+from PySide6.QtWidgets import QMessageBox, QMenu
 from PySide6.QtGui import QAction
 
-#modules
-from .categories_action import CategoriesAction
-from .accounts_action import AccountsAction
-from .accounting_periods_action import AccountingPeriodsAction
+# modules
+from setup_menu.categories_actions import CategoriesActions
+from setup_menu.accounting_periods_actions import AccountingPeriodsActions
+from setup_menu.accounts_actions import AccountsActions  # Import the new AccountActions class
 
 class SetupActions:
     def __init__(self, main_window):
         self.main_window = main_window
         self.setup_actions = {}
         self.action_handlers = {
-            'accounts': AccountsAction(main_window),
-            'accounting_periods': AccountingPeriodsAction(main_window),
-            'categories': CategoriesAction(main_window)
+            'accounts': AccountsActions(main_window),
+            'accounting_periods': AccountingPeriodsActions(main_window),
+            'categories': CategoriesActions(main_window)
         }
+        self.account_actions = AccountsActions(main_window)  # Initialize AccountActions
         self.create_setup_actions()
 
     def create_setup_actions(self):
-            # ORDER OF SETUP MENU DISPLAY:
-        # Accounts
-        self.setup_actions['accounts'] = QAction("Accounts", self.main_window)
-        self.setup_actions['accounts'].triggered.connect(
-            self.action_handlers['accounts'].execute
-        )
-        
+        # Add the Accounts menu from AccountActions
+        self.setup_actions['accounts'] = self.account_actions.accounts_menu
+
         # Accounting Periods
         self.setup_actions['accounting_periods'] = QAction("Accounting Periods", self.main_window)
         self.setup_actions['accounting_periods'].triggered.connect(
@@ -41,4 +38,7 @@ class SetupActions:
     def add_setup_actions_to_menu(self, setup_menu):
         """Add all setup actions to the setup menu"""
         for action in self.setup_actions.values():
-            setup_menu.addAction(action)
+            if isinstance(action, QMenu):
+                setup_menu.addMenu(action)
+            else:
+                setup_menu.addAction(action)

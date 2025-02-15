@@ -11,7 +11,7 @@ class CategoriesDialog(QDialog):
         # Add your categories UI components here
         self.setLayout(layout)
 
-class CategoriesAction:
+class CategoriesActions:
     def __init__(self, main_window):
         self.main_window = main_window
         

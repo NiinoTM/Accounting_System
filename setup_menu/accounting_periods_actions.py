@@ -11,7 +11,7 @@ class AccountingPeriodsDialog(QDialog):
         # Add your accounting periods UI components here
         self.setLayout(layout)
 
-class AccountingPeriodsAction:
+class AccountingPeriodsActions:
     def __init__(self, main_window):
         self.main_window = main_window
         
