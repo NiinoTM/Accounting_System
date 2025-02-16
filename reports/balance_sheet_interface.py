@@ -1,157 +1,310 @@
+
 # reports/balance_sheet_interface.py
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton,
-                              QMessageBox, QTextEdit, QHBoxLayout, QDialog)
+                              QMessageBox, QHBoxLayout, QDialog, QScrollArea)
 from PySide6.QtCore import Qt
 from .balance_sheet_core import BalanceSheet
 from utils.crud.generic_crud import GenericCRUD
 from utils.formatters import format_table_name
+import os
+from PySide6.QtGui import QPalette, QColor
+
 
 class BalanceSheetWindow(QWidget):
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
         self.setWindowTitle("Balance Sheet")
-        self.layout = QVBoxLayout(self)
+        self.init_ui()
+        self.selected_date = None
+        self.show_report_on_main_window()
+        self.setup_dark_theme()  # Apply dark theme
 
-        # Date Selection
-        top_layout = QHBoxLayout()
+
+    def setup_dark_theme(self):
+        """Sets up a dark theme for the UI."""
+        # Use a dark palette
+        palette = QPalette()
+        palette.setColor(QPalette.Window, QColor(53, 53, 53))
+        palette.setColor(QPalette.WindowText, Qt.white)
+        palette.setColor(QPalette.Base, QColor(25, 25, 25))
+        palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+        palette.setColor(QPalette.ToolTipBase, Qt.white)
+        palette.setColor(QPalette.ToolTipText, Qt.white)
+        palette.setColor(QPalette.Text, Qt.white)
+        palette.setColor(QPalette.Button, QColor(53, 53, 53))
+        palette.setColor(QPalette.ButtonText, Qt.white)
+        palette.setColor(QPalette.BrightText, Qt.red)
+        palette.setColor(QPalette.Link, QColor(42, 130, 218))
+        palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+        palette.setColor(QPalette.HighlightedText, Qt.black)
+
+        self.setPalette(palette)
+        self.setStyleSheet("""
+            QToolTip {
+                color: #ffffff;
+                background-color: #2a82da;
+                border: 1px solid white;
+            }
+        """)
+
+
+    def init_ui(self):
+        """Initialize the UI components"""
+        # Main layout
+        self.layout = QVBoxLayout(self)
+        self.layout.setSpacing(20)
+        self.layout.setContentsMargins(20, 20, 20, 20)
+
+        # Date Selection Area
+        date_area = QWidget()
+        date_layout = QHBoxLayout(date_area)
         self.date_label = QLabel("Select Date:")
         self.select_date_button = QPushButton("Select Date")
         self.select_date_button.clicked.connect(self.select_date)
-        top_layout.addWidget(self.date_label)
-        top_layout.addWidget(self.select_date_button)
-        self.layout.addLayout(top_layout)
+        date_layout.addWidget(self.date_label)
+        date_layout.addWidget(self.select_date_button)
+        date_layout.addStretch()
+        self.layout.addWidget(date_area)
+
+        # Header
+        self.header = QWidget()
+        header_layout = QVBoxLayout(self.header)
+        header_layout.setSpacing(5)
+        
+        title = QLabel("BALANCE SHEET")
+        title.setStyleSheet("""
+            font-size: 24px;
+            font-weight: bold;
+        """)
+        title.setAlignment(Qt.AlignCenter)
+        
+        self.date_display = QLabel("As of --/--/----")
+        self.date_display.setAlignment(Qt.AlignCenter)
+        
+        header_layout.addWidget(title)
+        header_layout.addWidget(self.date_display)
+        self.layout.addWidget(self.header)
+
+        # Content Area
+        content = QWidget()
+        content_layout = QHBoxLayout(content)
+        content_layout.setSpacing(20)
+
+        # Assets Column
+        assets_column = self.create_column("ASSETS")
+        self.current_assets_section = self.create_section("Current Assets")
+        self.fixed_assets_section = self.create_section("Fixed Assets")
+        assets_column.layout().addWidget(self.current_assets_section)
+        assets_column.layout().addWidget(self.fixed_assets_section)
+        assets_column.layout().addStretch()
+
+        # Liabilities & Equity Column
+        liab_equity_column = self.create_column("LIABILITIES & EQUITY")
+        self.current_liab_section = self.create_section("Current Liabilities")
+        self.noncurrent_liab_section = self.create_section("Long-Term Liabilities")
+        self.equity_section = self.create_section("Equity")
+        liab_equity_column.layout().addWidget(self.current_liab_section)
+        liab_equity_column.layout().addWidget(self.noncurrent_liab_section)
+        liab_equity_column.layout().addWidget(self.equity_section)
+        liab_equity_column.layout().addStretch()
+
+        content_layout.addWidget(assets_column)
+        content_layout.addWidget(liab_equity_column)
+
+        # Wrap content in scroll area
+        scroll = QScrollArea()
+        scroll.setWidget(content)
+        scroll.setWidgetResizable(True)
+        self.layout.addWidget(scroll)
+
+        # Totals Area
+        totals = QWidget()
+        totals_layout = QHBoxLayout(totals)
+        totals_layout.setSpacing(20)
+
+        self.total_assets_label = self.create_total_label("TOTAL ASSETS")
+        self.total_liab_equity_label = self.create_total_label("TOTAL LIABILITIES & EQUITY")
+
+        totals_layout.addWidget(self.total_assets_label)
+        totals_layout.addWidget(self.total_liab_equity_label)
+        
+        self.layout.addWidget(totals)
+        self.apply_styles()
 
 
-        # Report Display
-        self.report_text = QTextEdit()
-        self.report_text.setReadOnly(True)
-        self.layout.addWidget(self.report_text)
 
-        self.selected_date = None
-        self.show_report_on_main_window()
+    def create_column(self, title):
+        """Create a column widget with title"""
+        column = QWidget()
+        layout = QVBoxLayout(column)
+        layout.setSpacing(15)
+        
+        title_label = QLabel(title)
+        title_label.setStyleSheet("""
+            font-size: 18px;
+            font-weight: bold;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #3498db;
+        """)
+        layout.addWidget(title_label)
+        return column
 
+    def create_section(self, title):
+        """Create a section widget with title"""
+        section = QWidget()
+        layout = QVBoxLayout(section)
+        layout.setSpacing(10)
+        
+        title_label = QLabel(title)
+        title_label.setStyleSheet("""
+            font-size: 14px;
+            font-weight: bold;
+        """)
+        layout.addWidget(title_label)
+        return section
+
+    def create_total_label(self, text):
+        """Create a total label with specific styling"""
+        label = QLabel(f"{text}: $ 0.00")
+        label.setStyleSheet("""
+            font-size: 14px;
+            font-weight: bold;
+            padding: 10px;
+            border-top: 3px double;
+        """)
+        return label
+
+    def apply_styles(self):
+      self.setStyleSheet("""
+          QWidget {
+              font-family: 'Segoe UI', Arial, sans-serif;
+          }
+          QPushButton {
+              padding: 5px 15px;
+              background: #3498db;
+              border: none;
+              border-radius: 4px;
+          }
+          QPushButton:hover {
+              background: #2980b9;
+          }
+          QScrollArea {
+                background: #333;
+                border: 1px solid #555;
+                border-radius: 8px;
+            }
+      """)
+
+
+    def add_line_item(self, section, name, amount):
+        """Add a line item to a section"""
+        item = QWidget()
+        layout = QHBoxLayout(item)
+        layout.setContentsMargins(0, 5, 0, 5)
+        
+        name_label = QLabel(format_table_name(name))
+        amount_label = QLabel(f"$ {abs(amount):.2f}")
+        amount_label.setAlignment(Qt.AlignRight)
+        amount_label.setStyleSheet("font-family: 'Consolas', monospace;")
+        
+        layout.addWidget(name_label)
+        layout.addStretch()
+        layout.addWidget(amount_label)
+        
+        section.layout().addWidget(item)
+        return abs(amount)
+
+    def add_subtotal(self, section, text, amount):
+        """Add a subtotal line to a section"""
+        item = QWidget()
+        layout = QHBoxLayout(item)
+        layout.setContentsMargins(0, 10, 0, 5)
+        
+        text_label = QLabel(text)
+        amount_label = QLabel(f"$ {abs(amount):.2f}")
+        amount_label.setAlignment(Qt.AlignRight)
+        
+        text_label.setStyleSheet("""
+            font-weight: bold;
+            border-top: 1px solid #bdc3c7;
+            padding-top: 5px;
+        """)
+        amount_label.setStyleSheet("""
+            font-weight: bold;
+            font-family: 'Consolas', monospace;
+            border-top: 1px solid #bdc3c7;
+            padding-top: 5px;
+        """)
+        
+        layout.addWidget(text_label)
+        layout.addStretch()
+        layout.addWidget(amount_label)
+        
+        section.layout().addWidget(item)
 
     def select_date(self):
         """Opens a date selection dialog and generates the report."""
         from utils.crud.date_select import DateSelectWindow
-        date_dialog = DateSelectWindow()  # Use the DateSelectWindow
+        date_dialog = DateSelectWindow()
         if date_dialog.exec() == QDialog.Accepted:
             self.selected_date = date_dialog.calendar.selectedDate().toString('yyyy-MM-dd')
+            self.date_display.setText(f"As of {self.selected_date}")
             self.generate_report()
 
     def generate_report(self):
         """Generates and displays the balance sheet."""
         if not self.selected_date:
-            QMessageBox.warning(self.main_window, "Error", "Please select a date.")
+            QMessageBox.warning(self, "Error", "Please select a date.")
             return
 
         try:
             balance_sheet = BalanceSheet()
-            (ativos_circulantes, ativos_fixos,
-             passivos_circulantes, passivos_nao_circulantes,
-             patrimonio) = balance_sheet.calcular_saldos_na_data(self.selected_date)
+            ativos_circulantes, ativos_fixos, passivos_circulantes, passivos_nao_circulantes, patrimonio = (
+                balance_sheet.calcular_saldos_na_data(self.selected_date)
+            )
 
-            # For simplicity, we'll assume DRP (Demonstrativo do Resultado do Período)
-            # is 0.  In a real application, this would need to be calculated.
-            lucro_drp = 0
+            # Clear previous content
+            for section in [self.current_assets_section, self.fixed_assets_section,
+                          self.current_liab_section, self.noncurrent_liab_section,
+                          self.equity_section]:
+                while section.layout().count() > 1:  # Keep the title
+                    item = section.layout().takeAt(1)
+                    if item.widget():
+                        item.widget().deleteLater()
 
-            html_report = self.format_report_html(ativos_circulantes, ativos_fixos,
-                                                  passivos_circulantes, passivos_nao_circulantes,
-                                                  patrimonio, lucro_drp)
-            self.report_text.setHtml(html_report)
-            self.show_report_on_main_window() # Update central widget
+            # Add new content
+            total_current_assets = sum(self.add_line_item(self.current_assets_section, item['name'], item['balance'])
+                                     for item in ativos_circulantes)
+            self.add_subtotal(self.current_assets_section, "Total Current Assets", total_current_assets)
+
+            total_fixed_assets = sum(self.add_line_item(self.fixed_assets_section, item['name'], item['balance'])
+                                   for item in ativos_fixos)
+            self.add_subtotal(self.fixed_assets_section, "Total Fixed Assets", total_fixed_assets)
+
+            total_current_liab = sum(self.add_line_item(self.current_liab_section, item['name'], item['balance'])
+                                   for item in passivos_circulantes)
+            self.add_subtotal(self.current_liab_section, "Total Current Liabilities", total_current_liab)
+
+            total_noncurrent_liab = sum(self.add_line_item(self.noncurrent_liab_section, item['name'], item['balance'])
+                                      for item in passivos_nao_circulantes)
+            self.add_subtotal(self.noncurrent_liab_section, "Total Non-Current Liabilities", total_noncurrent_liab)
+
+            total_equity = sum(self.add_line_item(self.equity_section, item['name'], item['balance'])
+                             for item in patrimonio)
+            self.add_subtotal(self.equity_section, "Total Equity", total_equity)
+
+            # Update totals
+            total_assets = total_current_assets + total_fixed_assets
+            total_liab_equity = total_current_liab + total_noncurrent_liab + total_equity
+
+            self.total_assets_label.setText(f"TOTAL ASSETS: $ {total_assets:.2f}")
+            self.total_liab_equity_label.setText(f"TOTAL LIABILITIES & EQUITY: $ {total_liab_equity:.2f}")
 
         except Exception as e:
-            QMessageBox.critical(self.main_window, "Error", f"Failed to generate report: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to generate report: {e}")
         finally:
-            balance_sheet.close_connection() #close connection
-
-
-    def format_report_html(self, ativos_circulantes, ativos_fixos,
-                           passivos_circulantes, passivos_nao_circulantes,
-                           patrimonio, lucro_drp):
-        """Formats the balance sheet data into an HTML string."""
-
-        html = '<div style="font-family: monospace; text-align: center; width: 80%; margin: auto; font-size: 1.2em;">'
-        html += '<h2 style="margin-bottom: 0;">BALANCE SHEET</h2>'
-        html += f'<p style="margin-top: 0;">As of {self.selected_date}</p>'
-        html += '<div style="border-bottom: 2px solid black; margin-bottom: 10px;"></div>'
-
-        html += '<table style="width: 100%; border-collapse: collapse;">'
-
-        # --- Assets ---
-        html += '<tr><td style="vertical-align: top;">' # Left Column (Assets)
-        html += '<h3 style="margin-bottom: 5px; text-align: left;">ASSETS</h3>'
-        html += '<table style="width: 100%;">'
-
-        # Current Assets
-        total_ativos_circulantes = 0
-        if ativos_circulantes:  # Check if the list is not empty
-            html += '<tr><td colspan="2" style="font-weight: bold; text-align: left;">Current Assets</td></tr>'
-            for conta in ativos_circulantes:
-                html += f'<tr><td style="text-align: left; padding-left: 20px;">{format_table_name(conta["name"])}</td><td style="text-align: right;">$ {conta["balance"]:.2f}</td></tr>'
-                total_ativos_circulantes += conta['balance']
-            html += f'<tr><td style="text-align: left; padding-top: 5px;">Total Current Assets:</td><td style="text-align: right; border-top: 1px solid black; padding-top: 5px;">$ {total_ativos_circulantes:.2f}</td></tr>'
-
-        # Fixed Assets
-        total_ativos_fixos = 0
-        if ativos_fixos:
-            html += '<tr><td colspan="2" style="font-weight: bold; text-align: left; padding-top: 10px;">Fixed Assets</td></tr>'
-            for conta in ativos_fixos:
-                html += f'<tr><td style="text-align: left; padding-left: 20px;">{format_table_name(conta["name"])}</td><td style="text-align: right;">$ {conta["balance"]:.2f}</td></tr>'
-                total_ativos_fixos += conta["balance"]
-            html += f'<tr><td style="text-align: left; padding-top: 5px;">Total Fixed Assets:</td><td style="text-align: right; border-top: 1px solid black; padding-top: 5px;">$ {total_ativos_fixos:.2f}</td></tr>'
-        html += '</table>'
-        html += '</td>' # Close Assets Column
-
-
-        # --- Liabilities and Equity ---
-        html += '<td style="vertical-align: top;">'  # Right Column (Liabilities/Equity)
-        html += '<h3 style="margin-bottom: 5px; text-align: left;">LIABILITIES & EQUITY</h3>'
-        html += '<table style="width: 100%;">'
-
-        # Current Liabilities
-        total_passivos_circulantes = 0
-        if passivos_circulantes:
-            html += '<tr><td colspan="2" style="font-weight: bold; text-align: left;">Current Liabilities</td></tr>'
-            for conta in passivos_circulantes:
-                html += f'<tr><td style="text-align: left; padding-left: 20px;">{format_table_name(conta["name"])}</td><td style="text-align: right;">$ {conta["balance"]:.2f}</td></tr>'
-                total_passivos_circulantes += conta["balance"]
-            html += f'<tr><td style="text-align: left; padding-top: 5px;">Total Current Liabilities:</td><td style="text-align: right; border-top: 1px solid black; padding-top: 5px;">$ {total_passivos_circulantes:.2f}</td></tr>'
-
-        # Non-Current Liabilities
-        total_passivos_nao_circulantes = 0
-        if passivos_nao_circulantes:
-             html += '<tr><td colspan="2" style="font-weight: bold; text-align: left; padding-top: 10px;">Non-Current Liabilities</td></tr>'
-             for conta in passivos_nao_circulantes:
-                html += f'<tr><td style="text-align: left; padding-left: 20px;">{format_table_name(conta["name"])}</td><td style="text-align: right;">$ {conta["balance"]:.2f}</td></tr>'
-                total_passivos_nao_circulantes += conta['balance']
-             html += f'<tr><td style="text-align: left; padding-top: 5px;">Total Non-Current Liabilities:</td><td style="text-align: right; border-top: 1px solid black; padding-top: 5px;">$ {total_passivos_nao_circulantes:.2f}</td></tr>'
-
-        # Equity
-        total_patrimonio = 0
-        if patrimonio:
-            html += '<tr><td colspan="2" style="font-weight: bold; text-align: left; padding-top: 10px;">Equity</td></tr>'
-            for conta in patrimonio:
-                html += f'<tr><td style="text-align: left; padding-left: 20px;">{format_table_name(conta["name"])}</td><td style="text-align: right;">$ {conta["balance"]:.2f}</td></tr>'
-                total_patrimonio += conta["balance"]
-            html += f'<tr><td style="text-align: left; padding-top: 5px;">Total Equity:</td><td style="text-align: right; border-top: 1px solid black; padding-top: 5px;">$ {total_patrimonio:.2f}</td></tr>'
-        html += '</table>'
-        html += '</td></tr>'  # Close Liabilities/Equity Column
-
-        # --- Totals ---
-        total_ativos = total_ativos_circulantes + total_ativos_fixos
-        total_passivos_e_patrimonio = (total_passivos_circulantes +
-                                        total_passivos_nao_circulantes +
-                                        total_patrimonio + lucro_drp)
-        html += '<tr style="border-top: 2px solid black;"><td style="font-weight: bold; text-align: left; padding-top: 10px;">Total Assets:</td><td style="font-weight: bold; text-align: right; padding-top: 10px;">$ {total_ativos:.2f}</td>'  # Totals row
-        html += '<td style="font-weight: bold; text-align: left; padding-top: 10px;">Total Liabilities & Equity:</td><td style="font-weight: bold; text-align: right; padding-top: 10px;">$ {total_passivos_e_patrimonio:.2f}</td></tr>'  # Totals row
-
-        html += '</table>'
-        html += '</div>'  # Close container div
-        return html
+            balance_sheet.close_connection()
 
     def show_report_on_main_window(self):
-        """Shows the report in the main window's central widget."""
         self.main_window.setCentralWidget(self)
