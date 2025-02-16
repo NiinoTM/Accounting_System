@@ -25,7 +25,7 @@ class CRUD:
 
         inputs = {}
         for column in columns:
-            if column.lower() not in ['id', 'created_at', 'updated_at']:  # Skip auto-generated fields
+            if column.lower() not in ['id', 'created_at', 'updated_at', 'status', 'normalized_name']:  # Skip auto-generated fields
                 layout.addWidget(QLabel(column))
                 input_field = QLineEdit()
                 inputs[column] = input_field

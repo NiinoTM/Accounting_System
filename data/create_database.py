@@ -40,6 +40,7 @@ def create_database():
         id INTEGER PRIMARY KEY,
         code VARCHAR(20) NOT NULL UNIQUE,
         name VARCHAR(100) NOT NULL UNIQUE,
+        normalized_name VARCHAR(100) NOT NULL UNIQUE,
         description TEXT,
         type_id INTEGER REFERENCES account_types(id),
         category_id INTEGER REFERENCES categories(id),
@@ -115,33 +116,39 @@ def create_database():
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- Journal Entries
-    CREATE TABLE IF NOT EXISTS journal_entries (
+    -- Transactions
+    CREATE TABLE IF NOT EXISTS transactions (
         id INTEGER PRIMARY KEY,
-        entry_date DATE NOT NULL,
-        reference_number VARCHAR(50) NOT NULL UNIQUE,
+        date TEXT NOT NULL,
         description TEXT,
-        status VARCHAR(20) DEFAULT 'POSTED',
-        posted_by INTEGER,
-        posted_at TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    -- Journal Entry Lines
-    CREATE TABLE IF NOT EXISTS journal_entry_lines (
-        id INTEGER PRIMARY KEY,
-        journal_entry_id INTEGER REFERENCES journal_entries(id),
-        account_id INTEGER REFERENCES accounts(id),
-        description TEXT,
-        debit_amount DECIMAL(15,2) DEFAULT 0.00,
-        credit_amount DECIMAL(15,2) DEFAULT 0.00,
+        debit_account INTEGER NOT NULL,
+        credit_account INTEGER NOT NULL,
+        amount REAL NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT check_amount CHECK (
-            (debit_amount = 0 AND credit_amount > 0) OR
-            (debit_amount > 0 AND credit_amount = 0)
-        )
+        FOREIGN KEY (debit_account) REFERENCES accounts(id),
+        FOREIGN KEY (credit_account) REFERENCES accounts(id)
+    ); 
+
+    CREATE TABLE IF NOT EXISTS transaction_templates (
+        id INTEGER PRIMARY KEY,
+        name VARCHAR(100) NOT NULL UNIQUE
+    );
+
+    CREATE TABLE IF NOT EXISTS template_transactions (
+        id INTEGER PRIMARY KEY,
+        template_id INTEGER NOT NULL,
+        description TEXT NOT NULL,
+        FOREIGN KEY (template_id) REFERENCES transaction_templates(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS template_transaction_details (
+        id INTEGER PRIMARY KEY,
+        template_transaction_id INTEGER NOT NULL,
+        debit_account INTEGER NOT NULL,
+        credit_account INTEGER NOT NULL,
+        amount REAL NOT NULL,
+        FOREIGN KEY (template_transaction_id) REFERENCES template_transactions(id) ON DELETE CASCADE
     );
     """
 
