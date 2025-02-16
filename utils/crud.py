@@ -102,15 +102,30 @@ class CRUD:
         self.cursor.execute(f"SELECT * FROM {self.table_name}")
         records = self.cursor.fetchall()
         columns = self.get_columns()
-
+        
+        # Filter out normalized_name from columns and create display columns
+        display_columns = []
+        for col in columns:
+            if col.lower() != 'normalized_name':
+                display_columns.append(col)
+                
+        if 'normalized_name' in columns:
+            normalized_name_index = columns.index('normalized_name')
+        else:
+            normalized_name_index = -1
+        
         table = QTableWidget(main_window)
         table.setRowCount(len(records))
-        table.setColumnCount(len(columns))
-        table.setHorizontalHeaderLabels(columns)
+        table.setColumnCount(len(display_columns))
+        table.setHorizontalHeaderLabels(display_columns)
 
         for row_idx, row in enumerate(records):
+            col_offset = 0
             for col_idx, col in enumerate(row):
-                table.setItem(row_idx, col_idx, QTableWidgetItem(str(col)))
+                if col_idx == normalized_name_index:
+                    col_offset = 1
+                    continue
+                table.setItem(row_idx, col_idx - col_offset, QTableWidgetItem(str(col)))
 
         main_window.setCentralWidget(table)
 
