@@ -56,7 +56,6 @@ class DatabaseManager:
             id INTEGER PRIMARY KEY,
             name VARCHAR(100) NOT NULL UNIQUE,
             normalized_name VARCHAR(100) NOT NULL UNIQUE,
-            parent_id INTEGER REFERENCES categories(id),
             description TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
