@@ -1,20 +1,19 @@
 # utils/crud/generic_crud.py
+
 from PySide6.QtWidgets import (QMessageBox, QTableWidget, QTableWidgetItem,
                               QDialog, QVBoxLayout, QLineEdit,
                               QPushButton, QLabel, QHBoxLayout, QComboBox)
+from PySide6.QtCore import Qt
 import sqlite3
-from .base_crud import BaseCRUD  # Import the base class
-from .search_dialog import AdvancedSearchDialog #import the search dialog
+from .base_crud import BaseCRUD
+from .search_dialog import AdvancedSearchDialog
 from utils.formatters import normalize_text, format_table_name
 
 class GenericCRUD(BaseCRUD):
-    """CRUD operations applicable to most tables."""
-
     def __init__(self, table_name):
         super().__init__(table_name)
 
     def read(self, main_window):
-        """Read and display all records from the table."""
         self.cursor.execute(f"SELECT * FROM {self.table_name}")
         records = self.cursor.fetchall()
         columns = self.get_columns()
@@ -40,10 +39,31 @@ class GenericCRUD(BaseCRUD):
 
         main_window.setCentralWidget(table)
 
+    def _get_search_type(self, column_name):
+        """Determine search type based on column name."""
+
+        if self.table_name == 'transactions':
+            search_types = {
+                'debit_account': 'debit_account',
+                'credit_account': 'credit_account',
+                'category_id': 'category'
+            }
+            return search_types.get(column_name)
+        else:
+            return 'generic'
+
+    def _format_display_text(self, selected, column_name):
+        """Format the display text for the search dialog."""
+
+        if self.table_name == 'transactions':
+            if column_name in ['debit_account', 'credit_account']:
+                return f"{selected.get('name', '')} ({selected.get('code', '')})"
+            return selected.get('name', '')
+        else:
+            return selected.get('name','')
     def _create_input_fields(self, columns, dialog, record=None):
-        """Creates input fields for create and edit dialogs.  Handles common cases."""
         inputs = {}
-        layout = dialog.layout()  # Get existing layout
+        layout = dialog.layout()
 
         for idx, column in enumerate(columns):
             if column.lower() in ['id', 'created_at', 'updated_at', 'status', 'normalized_name', 'balance']:
@@ -52,13 +72,53 @@ class GenericCRUD(BaseCRUD):
             formatted_label = format_table_name(column)
             layout.addWidget(QLabel(formatted_label))
 
-            # Handle common input types
             if column == 'is_active':
                 combo = QComboBox()
-                combo.addItems(["Yes", "No"])
-                combo.setCurrentIndex(0 if not record or record[idx] == 'Yes' else 1)  # Set default/current
+                combo.addItems(["Yes", "No"])  # Display text
                 inputs[column] = combo
                 layout.addWidget(combo)
+
+                # Set item data *and* handle current value correctly
+                combo.setItemData(0, 1)  # Yes -> 1
+                combo.setItemData(1, 0)  # No -> 0
+
+                if record:
+                    current_value = record[idx]
+                    combo.setCurrentIndex(0 if current_value == 1 else 1)  # Select based on record value
+                else:
+                    combo.setCurrentIndex(0)  # Default to "Yes" (index 0)
+
+            elif column in ['debit_account', 'credit_account'] and self.table_name == 'transactions':
+                display_field = QLineEdit()
+                display_field.setReadOnly(True)
+                search_button = QPushButton("Search")
+                inputs[column] = {
+                    'display': display_field,
+                    'value': record[idx] if record else None,
+                    'button': search_button
+                }
+                field_layout = QHBoxLayout()
+                field_layout.addWidget(display_field)
+                field_layout.addWidget(search_button)
+                layout.addLayout(field_layout)
+
+                def create_search_handler(col_name, display_widget, input_dict):
+                    def handle_search():
+                        search_type = self._get_search_type(col_name)
+                        search_dialog = AdvancedSearchDialog(
+                            field_type=search_type,
+                            parent=dialog,
+                            db_path=self.db_path
+                        )
+                        if search_dialog.exec() == QDialog.Accepted:
+                            selected = search_dialog.get_selected_item()
+                            if selected:
+                                display_text = self._format_display_text(selected, col_name)
+                                display_widget.setText(display_text)
+                                input_dict[col_name]['value'] = selected['id']
+                    return handle_search
+
+                search_button.clicked.connect(create_search_handler(column, display_field, inputs))
 
             elif column.endswith('_date') or column == 'date':
                 date_input = QLineEdit()
@@ -87,14 +147,13 @@ class GenericCRUD(BaseCRUD):
                 date_button.clicked.connect(create_date_handler(column, date_input, inputs))
 
             else:
-                # Default to QLineEdit
                 input_field = QLineEdit(str(record[idx]) if record else "")
                 inputs[column] = input_field
                 layout.addWidget(input_field)
+
         return inputs
 
     def _save_record(self, dialog, inputs, update=False, record_id=None):
-        """Saves (inserts or updates) a record in the database."""
         columns = []
         values = []
         normalized_name = None
@@ -103,15 +162,19 @@ class GenericCRUD(BaseCRUD):
             if isinstance(input_field, dict):
                 value = input_field['value']
             elif isinstance(input_field, QComboBox):
-                value = input_field.currentText()
+                # ALWAYS get the itemData based on the CURRENT index.
+                value = input_field.itemData(input_field.currentIndex())
+                if value is None:
+                   value = 0
+
             elif isinstance(input_field, QLineEdit):
                 value = input_field.text()
             else:
                 value = None
 
-            if value == "" and column not in ['description']:  # Allow empty descriptions
+            if value == "" and column not in ['description']:
                 QMessageBox.warning(dialog, "Error", f"Please fill in {format_table_name(column)}")
-                return False  # Indicate failure
+                return False
 
             columns.append(column)
             values.append(value)
@@ -130,70 +193,57 @@ class GenericCRUD(BaseCRUD):
                 values.append(record_id)
             else:
                 query = f"INSERT INTO {self.table_name} ({', '.join(columns)}) VALUES ({', '.join(['?'] * len(values))})"
-
             self.cursor.execute(query, values)
             self.conn.commit()
             QMessageBox.information(dialog, "Success", f"Record {'updated' if update else 'created'} successfully!")
             dialog.close()
-            return True  # Indicate success
-
+            return True
         except sqlite3.Error as e:
             QMessageBox.critical(dialog, "Error", f"Failed to save record: {str(e)}")
-            return False  # Indicate failure
-    
+            return False
+
     def create(self, main_window):
-        """Creates a new record using a dialog."""
         dialog = QDialog(main_window)
         dialog.setWindowTitle(f"Create New Record in {self.formatted_table_name}")
         layout = QVBoxLayout()
-        dialog.setLayout(layout)  # Set layout *before* creating input fields
-
+        dialog.setLayout(layout)
         columns = self.get_columns()
         inputs = self._create_input_fields(columns, dialog)
-
         save_button = QPushButton("Save")
         save_button.clicked.connect(lambda: self._save_record(dialog, inputs))
         layout.addWidget(save_button)
         dialog.exec()
 
+
     def edit(self, main_window):
-        """Edits an existing record using a search dialog and edit form."""
         search_dialog = AdvancedSearchDialog(
             field_type='generic',
             parent=main_window,
             db_path=self.db_path,
             table_name=self.table_name
         )
-
         if search_dialog.exec() == QDialog.Accepted:
             selected_item = search_dialog.get_selected_item()
             if not selected_item:
                 return
-
             record_id = selected_item['id']
             self.cursor.execute(f"SELECT * FROM {self.table_name} WHERE id = ?", (record_id,))
             record = self.cursor.fetchone()
-
             if not record:
                 QMessageBox.warning(main_window, "Error", "Record not found!")
                 return
-
             dialog = QDialog(main_window)
             dialog.setWindowTitle(f"Edit Record in {self.formatted_table_name}")
             layout = QVBoxLayout()
             dialog.setLayout(layout)
-
             columns = self.get_columns()
             inputs = self._create_input_fields(columns, dialog, record)
-
             save_button = QPushButton("Save")
             save_button.clicked.connect(lambda: self._save_record(dialog, inputs, update=True, record_id=record_id))
             layout.addWidget(save_button)
             dialog.exec()
 
-
     def delete(self, main_window):
-        """Deletes a record after confirmation, using a search dialog."""
         search_dialog = AdvancedSearchDialog(
             field_type='generic',
             parent=main_window,
@@ -220,13 +270,12 @@ class GenericCRUD(BaseCRUD):
                     QMessageBox.critical(main_window, "Database Error", str(e))
 
     def open_search(self, field_type, filter_value=None, parent=None):
-        """Opens the advanced search dialog."""
-        # Ensure parent is passed correctly
         dialog = AdvancedSearchDialog(
             field_type=field_type,
             filter_value=filter_value,
-            parent=parent,  # Use the passed parent
-            db_path=self.db_path
+            parent=parent,
+            db_path=self.db_path,
+            table_name = self.table_name
         )
         if dialog.exec() == QDialog.Accepted:
             return dialog.get_selected_item()

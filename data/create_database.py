@@ -2,28 +2,33 @@ import sqlite3
 from pathlib import Path
 from typing import List, Tuple
 
+import sqlite3
+from pathlib import Path
+from typing import List, Tuple
+
 class DatabaseManager:
     def __init__(self, db_name: str = 'financial_system.db'):
         self.data_dir = Path('data')
         self.db_path = self.data_dir / db_name
         self.conn = None
         self.cursor = None
-        
+
     def __enter__(self):
         self.connect()
         return self
-        
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
-        
+
     def connect(self) -> None:
-        """Establish database connection"""
+        """Establish database connection and set row_factory."""
         self.data_dir.mkdir(exist_ok=True)
         self.conn = sqlite3.connect(self.db_path)
+        self.conn.row_factory = sqlite3.Row  # <--- CRITICAL: Set row_factory here
         self.cursor = self.conn.cursor()
-        
+
     def close(self) -> None:
-        """Close database connection"""
+        """Close database connection."""
         if self.conn:
             self.conn.close()
             
@@ -146,14 +151,14 @@ class DatabaseManager:
             id INTEGER PRIMARY KEY,
             date TEXT NOT NULL,
             description TEXT,
-            debit_account INTEGER NOT NULL,
-            credit_account INTEGER NOT NULL,
+            debited INTEGER NOT NULL,  
+            credited INTEGER NOT NULL,
             amount REAL NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (debit_account) REFERENCES accounts(id),
-            FOREIGN KEY (credit_account) REFERENCES accounts(id)
-        ); 
+            FOREIGN KEY (debited) REFERENCES accounts(id),
+            FOREIGN KEY (credited) REFERENCES accounts(id)
+        );
 
         CREATE TABLE IF NOT EXISTS transaction_templates (
             id INTEGER PRIMARY KEY,
