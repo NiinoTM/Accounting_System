@@ -333,16 +333,40 @@ class CRUD:
             combo_box.addItem(name, type_id)
 
     def delete(self, main_window):
-        """Delete a record from the table."""
-        record_id, ok = QInputDialog.getInt(main_window, "Delete Record", "Enter the ID of the record to delete:")
-        if not ok:
-            return
+        """Delete a record from the table using AdvancedSearchDialog."""
+        self.parent = main_window
 
-        confirm = QMessageBox.question(main_window, "Confirm Delete", "Are you sure you want to delete this record?", QMessageBox.Yes | QMessageBox.No)
-        if confirm == QMessageBox.Yes:
-            self.cursor.execute(f"DELETE FROM {self.table_name} WHERE id = ?", (record_id,))
-            self.conn.commit()
-            QMessageBox.information(main_window, "Success", "Record deleted successfully!")
+        # Use AdvancedSearchDialog to find the record
+        search_dialog = AdvancedSearchDialog(
+            field_type='generic',
+            parent=main_window,
+            db_path=self.db_path,
+            table_name=self.table_name
+        )
+
+        if search_dialog.exec() == QDialog.Accepted:
+            selected_item = search_dialog.get_selected_item()
+            if not selected_item:
+                return  # No item selected
+
+            record_id = selected_item['id']
+
+            # Confirmation dialog
+            confirm = QMessageBox.question(
+                main_window,
+                "Confirm Delete",
+                f"Are you sure you want to delete the record with ID {record_id}?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+
+            if confirm == QMessageBox.Yes:
+                try:
+                    self.cursor.execute(f"DELETE FROM {self.table_name} WHERE id = ?", (record_id,))
+                    self.conn.commit()
+                    QMessageBox.information(main_window, "Success", "Record deleted successfully!")
+                except sqlite3.Error as e:
+                    QMessageBox.critical(main_window, "Database Error", str(e))
+
 
     def open_search(self, field_type, filter_value=None):
         dialog = AdvancedSearchDialog(
