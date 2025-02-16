@@ -1,7 +1,8 @@
 # crud.py
-from PySide6.QtWidgets import QMessageBox, QTableWidget, QTableWidgetItem, QDialog, QVBoxLayout, QLineEdit, QPushButton, QLabel, QInputDialog
+from PySide6.QtWidgets import QMessageBox, QTableWidget, QTableWidgetItem, QDialog, QVBoxLayout, QLineEdit, QPushButton, QLabel, QInputDialog, QComboBox
 import sqlite3
 from pathlib import Path
+from utils.data_handlers import normalize_text
 
 class CRUD:
     def __init__(self, table_name):
@@ -15,6 +16,12 @@ class CRUD:
         self.cursor.execute(f"PRAGMA table_info({self.table_name})")
         columns = [column[1] for column in self.cursor.fetchall()]
         return columns
+    
+    def fetch_options(self, table_name):
+        """Fetch ID and name from a referenced table for dropdown selection."""
+        self.cursor.execute(f"SELECT id, name FROM {table_name}")
+        return self.cursor.fetchall()  # Returns a list of (id, name) tuples
+
 
     def create(self, main_window):
         """Create a new record in the table."""
@@ -24,9 +31,32 @@ class CRUD:
         layout = QVBoxLayout()
 
         inputs = {}
+
+        # Fetch options for type_id and category_id
+        type_options = self.fetch_options("account_types")
+        category_options = self.fetch_options("categories")
+
         for column in columns:
-            if column.lower() not in ['id', 'created_at', 'updated_at', 'status', 'normalized_name']:  # Skip auto-generated fields
-                layout.addWidget(QLabel(column))
+            if column.lower() in ['id', 'created_at', 'updated_at', 'status', 'normalized_name']:  
+                continue  # Skip auto-generated fields
+
+            layout.addWidget(QLabel(column))
+
+            if column == "type_id":
+                type_dropdown = QComboBox()
+                for id, name in type_options:
+                    type_dropdown.addItem(name, id)  # Display name, store ID
+                inputs[column] = type_dropdown
+                layout.addWidget(type_dropdown)
+            
+            elif column == "category_id":
+                category_dropdown = QComboBox()
+                for id, name in category_options:
+                    category_dropdown.addItem(name, id)
+                inputs[column] = category_dropdown
+                layout.addWidget(category_dropdown)
+
+            else:
                 input_field = QLineEdit()
                 inputs[column] = input_field
                 layout.addWidget(input_field)
@@ -38,13 +68,28 @@ class CRUD:
         dialog.setLayout(layout)
         dialog.exec()
 
+
     def save_record(self, dialog, inputs):
         """Save the new record to the database."""
         columns = []
         values = []
+        normalized_name = None
+
         for column, input_field in inputs.items():
+            if isinstance(input_field, QComboBox):  # Handle dropdown selection
+                value = input_field.currentData()  # Get selected ID
+            else:
+                value = input_field.text()
+            
             columns.append(column)
-            values.append(input_field.text())
+            values.append(value)
+
+            if column.lower() == "name":
+                normalized_name = normalize_text(value)
+
+        if "normalized_name" not in columns and normalized_name:
+            columns.append("normalized_name")
+            values.append(normalized_name)
 
         query = f"INSERT INTO {self.table_name} ({', '.join(columns)}) VALUES ({', '.join(['?'] * len(values))})"
         self.cursor.execute(query, values)

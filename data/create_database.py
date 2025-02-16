@@ -29,6 +29,7 @@ def create_database():
     CREATE TABLE IF NOT EXISTS categories (
         id INTEGER PRIMARY KEY,
         name VARCHAR(100) NOT NULL UNIQUE,
+        normalized_name VARCHAR(100) NOT NULL UNIQUE,
         parent_id INTEGER REFERENCES categories(id),
         description TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -53,7 +54,6 @@ def create_database():
     -- Accounting Periods
     CREATE TABLE IF NOT EXISTS accounting_periods (
         id INTEGER PRIMARY KEY,
-        name VARCHAR(100) NOT NULL UNIQUE,
         start_date DATE NOT NULL,
         end_date DATE NOT NULL,
         status VARCHAR(20) DEFAULT 'OPEN',
@@ -132,7 +132,8 @@ def create_database():
 
     CREATE TABLE IF NOT EXISTS transaction_templates (
         id INTEGER PRIMARY KEY,
-        name VARCHAR(100) NOT NULL UNIQUE
+        name VARCHAR(100) NOT NULL UNIQUE,
+        normalized_name VARCHAR(100) NOT NULL UNIQUE
     );
 
     CREATE TABLE IF NOT EXISTS template_transactions (
