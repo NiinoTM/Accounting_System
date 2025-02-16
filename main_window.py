@@ -6,6 +6,7 @@ from PySide6.QtCore import Qt
 from menu.setup_menu.setup_actions import SetupActions
 from menu.transactions_actions import TransactionsActions
 from menu.templates_actions import TemplatesActions
+from menu.reports_actions import ReportsActions
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -13,6 +14,7 @@ class MainWindow(QMainWindow):
         self.setup_actions = SetupActions(self)
         self.transactions_actions = TransactionsActions(self)
         self.templates_actions = TemplatesActions(self)
+        self.reports_actions = ReportsActions(self)
 
         self.init_ui()
         self.create_menu()
@@ -39,7 +41,10 @@ class MainWindow(QMainWindow):
         templates_menu = self.templates_actions.templates_menu
         menubar.addMenu(templates_menu)
 
-        reports_menu = menubar.addMenu("Reports")
+            # REPORTS
+        reports_menu = self.reports_actions.reports_menu  # Get the reports menu
+        menubar.addMenu(reports_menu) # Add the created reports menu
+
         assets_menu = menubar.addMenu("Fixed Assets")
         ar_ap_menu = menubar.addMenu("AR/AP") #accounts receivables & payable
         backup_menu = menubar.addMenu("Backups")
