@@ -2,12 +2,14 @@
 from PySide6.QtWidgets import QMessageBox, QTableWidget, QTableWidgetItem, QDialog, QVBoxLayout, QLineEdit, QPushButton, QLabel, QInputDialog, QComboBox
 import sqlite3
 from pathlib import Path
-from utils.data_handlers import normalize_text
+from utils.formatters import normalize_text, format_table_name
 
 class CRUD:
     def __init__(self, table_name):
         self.table_name = table_name
+        self.formatted_table_name = format_table_name(table_name)
         self.db_path = Path('data') / 'finance.db'
+
         self.conn = sqlite3.connect(self.db_path)
         self.cursor = self.conn.cursor()
 
@@ -27,7 +29,7 @@ class CRUD:
         """Create a new record in the table."""
         columns = self.get_columns()
         dialog = QDialog(main_window)
-        dialog.setWindowTitle(f"Create New Record in {self.table_name}")
+        dialog.setWindowTitle(f"Create New Record in {self.formatted_table_name}")
         layout = QVBoxLayout()
 
         inputs = {}
@@ -40,7 +42,8 @@ class CRUD:
             if column.lower() in ['id', 'created_at', 'updated_at', 'status', 'normalized_name']:  
                 continue  # Skip auto-generated fields
 
-            layout.addWidget(QLabel(column))
+            formatted_label = format_table_name(column)        
+            layout.addWidget(QLabel(formatted_label))
 
             if column == "type_id":
                 type_dropdown = QComboBox()
@@ -113,11 +116,14 @@ class CRUD:
             normalized_name_index = columns.index('normalized_name')
         else:
             normalized_name_index = -1
+
+        # Format column headers
+        formatted_columns = [format_table_name(col) for col in display_columns]
         
         table = QTableWidget(main_window)
         table.setRowCount(len(records))
         table.setColumnCount(len(display_columns))
-        table.setHorizontalHeaderLabels(display_columns)
+        table.setHorizontalHeaderLabels(formatted_columns)
 
         for row_idx, row in enumerate(records):
             col_offset = 0
@@ -143,7 +149,7 @@ class CRUD:
 
         columns = self.get_columns()
         dialog = QDialog(main_window)
-        dialog.setWindowTitle(f"Edit Record in {self.table_name}")
+        dialog.setWindowTitle(f"Edit Record in {self.formatted_table_name}")
         layout = QVBoxLayout()
 
         inputs = {}
