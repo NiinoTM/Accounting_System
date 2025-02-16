@@ -3,9 +3,9 @@ from PySide6.QtWidgets import QMessageBox, QMenu
 from PySide6.QtGui import QAction
 
 # modules
-from setup_menu.accounts_actions import AccountsActions  # Import the new AccountActions class
-from setup_menu.accounting_periods_actions import AccountingPeriodsActions
-from setup_menu.categories_actions import CategoriesActions
+from menu.setup_menu.accounts_actions import AccountsActions  # Import the new AccountActions class
+from menu.setup_menu.accounting_periods_actions import AccountingPeriodsActions
+from menu.setup_menu.categories_actions import CategoriesActions
 
 class SetupActions:
     def __init__(self, main_window):

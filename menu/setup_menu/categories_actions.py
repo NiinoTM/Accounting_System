@@ -2,12 +2,13 @@ from PySide6.QtWidgets import QMessageBox, QMenu
 from PySide6.QtGui import QAction
 
 #modules
-from utils.crud import CRUD
+from utils.crud.generic_crud import GenericCRUD
 
 class CategoriesActions:
     def __init__(self, main_window):
         self.main_window = main_window
         self.categories_menu = self.create_categories_actions()
+        self.crud = GenericCRUD("categories")
 
     def create_categories_actions(self):
         # Create the main categoriess menu
@@ -34,17 +35,13 @@ class CategoriesActions:
         return categories_menu
 
     def create_categories(self):
-        crud = CRUD("categories")
-        crud.create(self.main_window)
+         self.crud.create(self.main_window)
 
     def read_categories(self):
-        crud = CRUD("categories")
-        crud.read(self.main_window)
+        self.crud.read(self.main_window)
 
     def update_categories(self):
-        crud = CRUD("categories")
-        crud.edit(self.main_window)
+        self.crud.edit(self.main_window)
 
     def delete_categories(self):
-        crud = CRUD("categories")
-        crud.delete(self.main_window)
+        self.crud.delete(self.main_window)

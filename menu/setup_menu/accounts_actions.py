@@ -3,12 +3,13 @@ from PySide6.QtWidgets import QMessageBox, QMenu
 from PySide6.QtGui import QAction
 
 #modules
-from utils.crud import CRUD
+from utils.crud.account_crud import AccountCRUD
 
 class AccountsActions:
     def __init__(self, main_window):
         self.main_window = main_window
         self.accounts_menu = self.create_account_actions()
+        self.crud = AccountCRUD()
 
     def create_account_actions(self):
         # Create the main Accounts menu
@@ -35,17 +36,13 @@ class AccountsActions:
         return accounts_menu
 
     def create_account(self):
-        crud = CRUD("accounts")
-        crud.create(self.main_window)
+        self.crud.create(self.main_window)
 
     def read_accounts(self):
-        crud = CRUD("accounts")
-        crud.read(self.main_window)
+        self.crud.read(self.main_window)
 
     def update_account(self):
-        crud = CRUD("accounts")
-        crud.edit(self.main_window)
+        self.crud.edit(self.main_window)
 
     def delete_account(self):
-        crud = CRUD("accounts")
-        crud.delete(self.main_window)
+        self.crud.delete(self.main_window)

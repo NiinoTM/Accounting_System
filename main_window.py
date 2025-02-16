@@ -3,9 +3,9 @@ from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QLabel
 from PySide6.QtCore import Qt
 
 #modules
-from setup_menu.setup_actions import SetupActions
-from transactions_actions import TransactionsActions
-from templates_actions import TemplatesActions
+from menu.setup_menu.setup_actions import SetupActions
+from menu.transactions_actions import TransactionsActions
+from menu.templates_actions import TemplatesActions
 
 class MainWindow(QMainWindow):
     def __init__(self):

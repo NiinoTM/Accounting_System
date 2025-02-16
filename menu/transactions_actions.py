@@ -3,13 +3,14 @@ from PySide6.QtWidgets import QMenu
 from PySide6.QtGui import QAction
 
 #modules
-from utils.crud import CRUD
+from utils.crud.generic_crud import GenericCRUD
 
 class TransactionsActions:
     def __init__(self, main_window):
         self.main_window = main_window
         self.transactions_menu = self.create_transactions_actions()
-    
+        self.crud = GenericCRUD("transactions")
+
     def create_transactions_actions(self):
     # Add CRUD actions to the transactionss menu
         transactions_menu = QMenu("Transactions", self.main_window)
@@ -35,17 +36,13 @@ class TransactionsActions:
         return transactions_menu
 
     def create_transactions(self):
-        crud = CRUD("transactions")
-        crud.create(self.main_window)
+        self.crud.create(self.main_window)
 
     def read_transactions(self):
-        crud = CRUD("transactions")
-        crud.read(self.main_window)
+        self.crud.read(self.main_window)
 
     def update_transactions(self):
-        crud = CRUD("transactions")
-        crud.edit(self.main_window)
+        self.crud.edit(self.main_window)
 
     def delete_transactions(self):
-        crud = CRUD("transactions")
-        crud.delete(self.main_window)
+        self.crud.delete(self.main_window)

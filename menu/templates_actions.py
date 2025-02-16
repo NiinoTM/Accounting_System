@@ -3,12 +3,14 @@ from PySide6.QtWidgets import QMenu
 from PySide6.QtGui import QAction
 
 #modules
-from utils.crud import CRUD
+from utils.crud.generic_crud import GenericCRUD
+
 
 class TemplatesActions:
     def __init__(self, main_window):
         self.main_window = main_window
         self.templates_menu = self.create_templates_actions()
+        self.crud = GenericCRUD("transaction_templates") 
     
     def create_templates_actions(self):
     # Add CRUD actions to the templatess menu
@@ -35,43 +37,13 @@ class TemplatesActions:
         return templates_menu
 
     def create_templates(self):
-        crud = CRUD("transaction_templates")
-        crud.create(self.main_window)
+        self.crud.create(self.main_window)
 
     def read_templates(self):
-        crud = CRUD("transaction_templates")
-        crud.read(self.main_window)
+        self.crud.read(self.main_window)
 
     def update_templates(self):
-        crud = CRUD("transaction_templates")
-        crud.edit(self.main_window)
+        self.crud.edit(self.main_window)
 
     def delete_templates(self):
-        crud = CRUD("transaction_templates")
-        crud.delete(self.main_window)
-
-
-"""
-    TABLES TO CHANGE
-    
-    CREATE TABLE IF NOT EXISTS transaction_templates (
-        id INTEGER PRIMARY KEY,
-        name VARCHAR(100) NOT NULL UNIQUE
-    );
-
-    CREATE TABLE IF NOT EXISTS template_transactions (
-        id INTEGER PRIMARY KEY,
-        template_id INTEGER NOT NULL,
-        description TEXT NOT NULL,
-        FOREIGN KEY (template_id) REFERENCES transaction_templates(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS template_transaction_details (
-        id INTEGER PRIMARY KEY,
-        template_transaction_id INTEGER NOT NULL,
-        debit_account INTEGER NOT NULL,
-        credit_account INTEGER NOT NULL,
-        amount REAL NOT NULL,
-        FOREIGN KEY (template_transaction_id) REFERENCES template_transactions(id) ON DELETE CASCADE
-    );
-"""
+        self.crud.delete(self.main_window)

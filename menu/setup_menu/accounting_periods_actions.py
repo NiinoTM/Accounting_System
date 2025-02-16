@@ -2,12 +2,13 @@ from PySide6.QtWidgets import QMessageBox, QMenu
 from PySide6.QtGui import QAction
 
 #modules
-from utils.crud import CRUD
+from utils.crud.generic_crud import GenericCRUD
 
 class AccountingPeriodsActions:
     def __init__(self, main_window):
         self.main_window = main_window
         self.accounting_periods_menu = self.create_accounting_periods_actions()
+        self.crud = GenericCRUD("accounting_periods") 
 
     def create_accounting_periods_actions(self):
         # Create the main accounting_periodss menu
@@ -34,17 +35,13 @@ class AccountingPeriodsActions:
         return accounting_periods_menu
 
     def create_accounting_periods(self):
-        crud = CRUD("accounting_periods")
-        crud.create(self.main_window)
+        self.crud.create(self.main_window)
 
     def read_accounting_periods(self):
-        crud = CRUD("accounting_periods")
-        crud.read(self.main_window)
+        self.crud.read(self.main_window)
 
     def update_accounting_periods(self):
-        crud = CRUD("accounting_periods")
-        crud.edit(self.main_window)
+        self.crud.edit(self.main_window)
 
     def delete_accounting_periods(self):
-        crud = CRUD("accounting_periods")
-        crud.delete(self.main_window)
+        self.crud.delete(self.main_window)

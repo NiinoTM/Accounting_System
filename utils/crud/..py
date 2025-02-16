@@ -5,8 +5,8 @@ from PySide6.QtWidgets import (QMessageBox, QTableWidget, QTableWidgetItem,
 import sqlite3
 from utils.formatters import normalize_text, format_table_name
 from data.create_database import DatabaseManager
-from utils.search_dialog import AdvancedSearchDialog
-from utils.date_select import DateSelectWindow
+from utils.crud.search_dialog import AdvancedSearchDialog
+from utils.crud.date_select import DateSelectWindow
 
 class CRUD:
     def __init__(self, table_name):
