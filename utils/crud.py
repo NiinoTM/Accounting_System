@@ -1,10 +1,12 @@
-from PySide6.QtWidgets import (QMessageBox, QTableWidget, QTableWidgetItem, 
-                              QDialog, QHBoxLayout, QVBoxLayout, QLineEdit, 
+
+from PySide6.QtWidgets import (QMessageBox, QTableWidget, QTableWidgetItem,
+                              QDialog, QHBoxLayout, QVBoxLayout, QLineEdit,
                               QPushButton, QLabel, QInputDialog, QComboBox)
 import sqlite3
 from utils.formatters import normalize_text, format_table_name
 from data.create_database import DatabaseManager
 from utils.search_dialog import AdvancedSearchDialog
+from utils.date_select import DateSelectWindow
 
 class CRUD:
     def __init__(self, table_name):
@@ -19,7 +21,6 @@ class CRUD:
         self.cursor.execute(f"PRAGMA table_info({self.table_name})")
         columns = [column[1] for column in self.cursor.fetchall()]
         return columns
-
     def create(self, main_window):
         """Create a new record in the table."""
         self.parent = main_window
@@ -30,56 +31,98 @@ class CRUD:
         inputs = {}
 
         for column in columns:
-            if column.lower() in ['id', 'created_at', 'updated_at', 'status', 'normalized_name']:
+            if column.lower() in ['id', 'created_at', 'updated_at', 'status', 'normalized_name', 'balance']:
                 continue
 
             formatted_label = format_table_name(column)
             layout.addWidget(QLabel(formatted_label))
 
-            if column in ['debit_account', 'credit_account', 'category_id']:  # Removed 'parent_id'
-                display_field = QLineEdit()
-                display_field.setReadOnly(True)
-                search_button = QPushButton("Search")
-                
-                inputs[column] = {
-                    'display': display_field,
-                    'value': None,
-                    'button': search_button
-                }
+            if column in ['debit_account', 'credit_account', 'category_id', 'type_id']:
+                if column == 'type_id':
+                    # Special handling for type_id: Dropdown
+                    display_widget = QComboBox()
+                    inputs[column] = {
+                        'display': display_widget,
+                        'value': None,  # Initialize value to None
+                    }
+                    field_layout = QHBoxLayout()
+                    field_layout.addWidget(display_widget)
+                    layout.addLayout(field_layout)
+                    self.populate_account_types(display_widget)
 
-                field_layout = QHBoxLayout()
-                field_layout.addWidget(display_field)
-                field_layout.addWidget(search_button)
-                layout.addLayout(field_layout)
+                    def type_id_changed(index, col=column):
+                        selected_item = display_widget.itemData(index)
+                        inputs[col]['value'] = selected_item if selected_item else None
 
-                def create_search_handler(column_name, display_widget, input_dict):
-                    def handle_search():
-                        search_type = self._get_search_type(column_name)
-                        dialog = AdvancedSearchDialog(
-                            field_type=search_type,
-                            parent=self.parent,
-                            db_path=self.db_path
-                        )
-                        
-                        if dialog.exec() == QDialog.Accepted:
-                            selected = dialog.get_selected_item()
-                            if selected:
-                                display_text = self._format_display_text(selected, column_name)
-                                display_widget.setText(display_text)
-                                input_dict[column_name]['value'] = selected['ID']
-                    return handle_search
+                    display_widget.currentIndexChanged.connect(type_id_changed)
 
-                search_button.clicked.connect(
-                    create_search_handler(column, display_field, inputs)
-                )
+                else:
+                    # Existing search logic
+                    display_field = QLineEdit()
+                    display_field.setReadOnly(True)
+                    search_button = QPushButton("Search")
+
+                    inputs[column] = {
+                        'display': display_field,
+                        'value': None,
+                        'button': search_button
+                    }
+
+                    field_layout = QHBoxLayout()
+                    field_layout.addWidget(display_field)
+                    field_layout.addWidget(search_button)
+                    layout.addLayout(field_layout)
+
+                    def create_search_handler(column_name, display_widget, input_dict):
+                        def handle_search():
+                            search_type = self._get_search_type(column_name)
+                            dialog = AdvancedSearchDialog(
+                                field_type=search_type,
+                                parent=self.parent,
+                                db_path=self.db_path
+                            )
+                            if dialog.exec() == QDialog.Accepted:
+                                selected = dialog.get_selected_item()
+                                if selected:
+                                    display_text = self._format_display_text(selected, column_name)
+                                    display_widget.setText(display_text)
+                                    input_dict[column_name]['value'] = selected['id']
+                        return handle_search
+
+                    search_button.clicked.connect(create_search_handler(column, display_field, inputs))
+
             elif column == 'is_active':
-                # Add dropdown for is_active
                 combo = QComboBox()
                 combo.addItem("Yes")
                 combo.addItem("No")
-                combo.setCurrentIndex(0)  # Default to "Yes"
+                combo.setCurrentIndex(0)
                 inputs[column] = combo
                 layout.addWidget(combo)
+
+            elif column.endswith('_date') or column == 'date':
+                date_input = QLineEdit()
+                date_input.setReadOnly(True)
+                date_button = QPushButton("Select Date")
+                inputs[column] = {
+                    'display': date_input,
+                    'value': None,
+                    'button': date_button
+                }
+                field_layout = QHBoxLayout()
+                field_layout.addWidget(date_input)
+                field_layout.addWidget(date_button)
+                layout.addLayout(field_layout)
+
+                def create_date_handler(column_name, display_widget, input_dict):
+                    def handle_date_select():
+                        date_dialog = DateSelectWindow()
+                        if date_dialog.exec() == QDialog.Accepted:
+                            selected_date = date_dialog.calendar.selectedDate().toString('yyyy-MM-dd')
+                            display_widget.setText(selected_date)
+                            input_dict[column_name]['value'] = selected_date
+                    return handle_date_select
+
+                date_button.clicked.connect(create_date_handler(column, date_input, inputs))
             else:
                 input_field = QLineEdit()
                 inputs[column] = input_field
@@ -91,9 +134,7 @@ class CRUD:
         dialog.setLayout(layout)
         dialog.exec()
 
-
     def _get_search_type(self, column_name):
-        """Determine search type based on column name."""
         search_types = {
             'debit_account': 'debit_account',
             'credit_account': 'credit_account',
@@ -102,34 +143,32 @@ class CRUD:
         return search_types.get(column_name)
 
     def _format_display_text(self, selected, column_name):
-        """Format display text based on column type."""
         if column_name in ['debit_account', 'credit_account']:
-            return f"{selected['Name']} ({selected['Code']})"
-        return selected['Name']
+            return f"{selected.get('name', '')} ({selected.get('code', '')})"
+        return selected.get('name', '')
 
     def save_record(self, dialog, inputs):
-        """Save the new record to the database."""
         columns = []
         values = []
         normalized_name = None
 
         for column, input_field in inputs.items():
             if isinstance(input_field, dict):
-                if input_field['value'] is None:
-                    QMessageBox.warning(dialog, "Error", f"Please select a value for {format_table_name(column)}")
-                    return
+                # Always get the value, even if it's None.  This is crucial.
                 value = input_field['value']
             else:
                 if isinstance(input_field, QComboBox):
                     value = input_field.currentText()
                 elif isinstance(input_field, QLineEdit):
                     value = input_field.text()
-                # Process the value as needed
-                
-            if not value:
+                else:  # Handle other input types if needed
+                    value = None
+
+            # Allow empty values only for 'description' and 'type_id' if explicitly allowed
+            if value == "" and column not in ['description', 'type_id']:
                 QMessageBox.warning(dialog, "Error", f"Please fill in {format_table_name(column)}")
                 return
-                
+
             columns.append(column)
             values.append(value)
 
@@ -141,7 +180,9 @@ class CRUD:
             values.append(normalized_name)
 
         query = f"INSERT INTO {self.table_name} ({', '.join(columns)}) VALUES ({', '.join(['?'] * len(values))})"
-        
+        print(query)
+        print(values)
+
         try:
             self.cursor.execute(query, values)
             self.conn.commit()
@@ -150,18 +191,19 @@ class CRUD:
         except sqlite3.Error as e:
             QMessageBox.critical(dialog, "Error", f"Failed to save record: {str(e)}")
 
+
     def read(self, main_window):
         """Read and display all records from the table."""
         self.cursor.execute(f"SELECT * FROM {self.table_name}")
         records = self.cursor.fetchall()
         columns = self.get_columns()
-        
+
         # Filter out normalized_name from columns and create display columns
         display_columns = []
         for col in columns:
             if col.lower() != 'normalized_name':
                 display_columns.append(col)
-                
+
         if 'normalized_name' in columns:
             normalized_name_index = columns.index('normalized_name')
         else:
@@ -169,7 +211,7 @@ class CRUD:
 
         # Format column headers
         formatted_columns = [format_table_name(col) for col in display_columns]
-        
+
         table = QTableWidget(main_window)
         table.setRowCount(len(records))
         table.setColumnCount(len(display_columns))
@@ -186,53 +228,109 @@ class CRUD:
         main_window.setCentralWidget(table)
 
     def edit(self, main_window):
-        """Edit an existing record in the table."""
-        record_id, ok = QInputDialog.getInt(main_window, "Edit Record", "Enter the ID of the record to edit:")
-        if not ok:
-            return
+        """Edit an existing record in the table using AdvancedSearchDialog."""
+        self.parent = main_window
 
-        self.cursor.execute(f"SELECT * FROM {self.table_name} WHERE id = ?", (record_id,))
-        record = self.cursor.fetchone()
-        if not record:
-            QMessageBox.warning(main_window, "Error", "Record not found!")
-            return
+        search_dialog = AdvancedSearchDialog(
+            field_type='generic',
+            parent=main_window,
+            db_path=self.db_path,
+            table_name=self.table_name
+        )
 
-        columns = self.get_columns()
-        dialog = QDialog(main_window)
-        dialog.setWindowTitle(f"Edit Record in {self.formatted_table_name}")
-        layout = QVBoxLayout()
+        if search_dialog.exec() == QDialog.Accepted:
+            selected_item = search_dialog.get_selected_item()
+            if not selected_item:
+                return
 
-        inputs = {}
-        for idx, column in enumerate(columns):
-            formatted_label = format_table_name(column)        
-            layout.addWidget(QLabel(formatted_label))
-            input_field = QLineEdit(str(record[idx]))
-            inputs[column] = input_field
-            layout.addWidget(input_field)
+            record_id = selected_item['id']
+            self.cursor.execute(f"SELECT * FROM {self.table_name} WHERE id = ?", (record_id,))
+            record = self.cursor.fetchone()
 
-        save_button = QPushButton("Save")
-        save_button.clicked.connect(lambda: self.update_record(dialog, inputs, record_id))
-        layout.addWidget(save_button)
+            if not record:
+                QMessageBox.warning(main_window, "Error", "Record not found!")
+                return
 
-        dialog.setLayout(layout)
-        dialog.exec()
+            columns = self.get_columns()
+            dialog = QDialog(main_window)
+            dialog.setWindowTitle(f"Edit Record in {self.formatted_table_name}")
+            layout = QVBoxLayout()
+            inputs = {}
+
+            for idx, column in enumerate(columns):
+                if column.lower() == 'id':
+                    continue
+
+                formatted_label = format_table_name(column)
+                layout.addWidget(QLabel(formatted_label))
+
+                if column == 'type_id':
+                    display_widget = QComboBox()
+                    inputs[column] = {
+                        'display': display_widget,
+                        'value': None,  # Initialize
+                    }
+                    field_layout = QHBoxLayout()
+                    field_layout.addWidget(display_widget)
+                    layout.addLayout(field_layout)
+                    self.populate_account_types(display_widget)
+
+                    current_type_id = record[idx]
+                    if current_type_id is not None:
+                        for i in range(display_widget.count()):
+                            if display_widget.itemData(i) == current_type_id:
+                                display_widget.setCurrentIndex(i)
+                                inputs[column]['value'] = current_type_id  # Set initial value
+                                break
+                    # Connect AFTER setting initial value
+                    def type_id_changed(index, col=column):
+                        selected_item = display_widget.itemData(index)
+                        inputs[col]['value'] = selected_item if selected_item else None
+
+                    display_widget.currentIndexChanged.connect(type_id_changed)
+
+                else:
+                    input_field = QLineEdit(str(record[idx]))
+                    inputs[column] = input_field
+                    layout.addWidget(input_field)
+
+            save_button = QPushButton("Save")
+            save_button.clicked.connect(lambda: self.update_record(dialog, inputs, record_id))
+            layout.addWidget(save_button)
+            dialog.setLayout(layout)
+            dialog.exec()
+
+
 
     def update_record(self, dialog, inputs, record_id):
         """Update the record in the database."""
         columns = []
         values = []
         for column, input_field in inputs.items():
-            if column.lower() not in ['id', 'created_at', 'updated_at']:  # Skip auto-generated fields
+            if column.lower() not in ['id', 'created_at', 'updated_at']:
                 columns.append(column)
-                values.append(input_field.text())
+                if isinstance(input_field, dict):
+                    values.append(input_field['value'])  # Get 'value' from dict
+                else:
+                    values.append(input_field.text())
 
         set_clause = ', '.join([f"{col} = ?" for col in columns])
         query = f"UPDATE {self.table_name} SET {set_clause} WHERE id = ?"
         values.append(record_id)
-        self.cursor.execute(query, values)
-        self.conn.commit()
-        QMessageBox.information(dialog, "Success", "Record updated successfully!")
-        dialog.close()
+        try:
+            self.cursor.execute(query, values)
+            self.conn.commit()
+            QMessageBox.information(dialog, "Success", "Record updated successfully!")
+            dialog.close()
+        except sqlite3.Error as e:
+            QMessageBox.critical(dialog, "Database Error", str(e))
+
+    def populate_account_types(self, combo_box):
+        """Populate the QComboBox with account types from the database."""
+        self.cursor.execute("SELECT id, name FROM account_types")
+        account_types = self.cursor.fetchall()
+        for type_id, name in account_types:
+            combo_box.addItem(name, type_id)
 
     def delete(self, main_window):
         """Delete a record from the table."""
@@ -247,14 +345,12 @@ class CRUD:
             QMessageBox.information(main_window, "Success", "Record deleted successfully!")
 
     def open_search(self, field_type, filter_value=None):
- 
         dialog = AdvancedSearchDialog(
             field_type=field_type,
             filter_value=filter_value,
             parent=self.parent,
            db_path=self.db_path
         )
-            
         if dialog.exec() == QDialog.Accepted:
             return dialog.get_selected_item()
         return None
