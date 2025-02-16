@@ -2,13 +2,15 @@
 from PySide6.QtWidgets import QMessageBox, QTableWidget, QTableWidgetItem, QDialog, QVBoxLayout, QLineEdit, QPushButton, QLabel, QInputDialog, QComboBox
 import sqlite3
 from pathlib import Path
+
 from utils.formatters import normalize_text, format_table_name
+from data.create_database import DatabaseManager
 
 class CRUD:
     def __init__(self, table_name):
         self.table_name = table_name
         self.formatted_table_name = format_table_name(table_name)
-        self.db_path = Path('data') / 'finance.db'
+        self.db_path = DatabaseManager().db_path
 
         self.conn = sqlite3.connect(self.db_path)
         self.cursor = self.conn.cursor()
