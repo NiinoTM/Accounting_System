@@ -1,7 +1,4 @@
-import sqlite3
-from pathlib import Path
-from typing import List, Tuple
-
+# create_database.py (Modified)
 import sqlite3
 from pathlib import Path
 from typing import List, Tuple
@@ -31,12 +28,12 @@ class DatabaseManager:
         """Close database connection."""
         if self.conn:
             self.conn.close()
-            
+
     def commit(self) -> None:
         """Commit changes to database"""
         if self.conn:
             self.conn.commit()
-            
+
     def rollback(self) -> None:
         """Rollback changes"""
         if self.conn:
@@ -151,7 +148,7 @@ class DatabaseManager:
             id INTEGER PRIMARY KEY,
             date TEXT NOT NULL,
             description TEXT,
-            debited INTEGER NOT NULL,  
+            debited INTEGER NOT NULL,
             credited INTEGER NOT NULL,
             amount REAL NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -173,16 +170,19 @@ class DatabaseManager:
             FOREIGN KEY (template_id) REFERENCES transaction_templates(id) ON DELETE CASCADE
         );
 
+        -- Changed debit_account and credit_account to debited and credited
         CREATE TABLE IF NOT EXISTS template_transaction_details (
             id INTEGER PRIMARY KEY,
             template_transaction_id INTEGER NOT NULL,
-            debit_account INTEGER NOT NULL,
-            credit_account INTEGER NOT NULL,
+            debited INTEGER NOT NULL,  
+            credited INTEGER NOT NULL,
             amount REAL NOT NULL,
-            FOREIGN KEY (template_transaction_id) REFERENCES template_transactions(id) ON DELETE CASCADE
+            FOREIGN KEY (template_transaction_id) REFERENCES template_transactions(id) ON DELETE CASCADE,
+            FOREIGN KEY (debited) REFERENCES accounts(id),
+            FOREIGN KEY (credited) REFERENCES accounts(id)
         );
         """
-    
+
     @property
     def default_account_types(self) -> List[Tuple[str, str, str]]:
         """Default account types data"""
@@ -195,13 +195,13 @@ class DatabaseManager:
             ('Revenue', 'CREDIT', 'Income from business activities'),
             ('Expense', 'DEBIT', 'Costs incurred in business operations')
         ]
-    
+
     def initialize_database(self) -> bool:
         """Initialize the database with tables and default data"""
         try:
             # Create tables
             self.cursor.executescript(self.create_tables_sql)
-            
+
             # Insert default account types if they don't exist
             self.cursor.execute("SELECT COUNT(*) FROM account_types")
             if self.cursor.fetchone()[0] == 0:
@@ -209,12 +209,12 @@ class DatabaseManager:
                     "INSERT INTO account_types (name, normal_balance, description) VALUES (?, ?, ?)",
                     self.default_account_types
                 )
-            
+
             # Commit the changes
             self.commit()
             print("Database initialized successfully!")
             return True
-            
+
         except sqlite3.Error as e:
             print(f"An error occurred: {e}")
             self.rollback()
