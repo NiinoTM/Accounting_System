@@ -343,9 +343,12 @@ class BalanceSheetWindow(QWidget):
             if net_income != 0:
                 self.add_line_item(self.equity_section, 
                                  "Net Income" if net_income >= 0 else "Net Loss", 
-                                 net_income,
+                                 -net_income,
                                  is_right_side=True)
-                total_equity += net_income
+                if net_income >= 0:
+                    total_equity += net_income
+                else:
+                    total_equity -= net_income
 
             if total_equity != 0:
                 self.add_subtotal(self.equity_section, "Total Equity", 
