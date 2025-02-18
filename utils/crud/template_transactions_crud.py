@@ -263,33 +263,42 @@ class TemplateTransactionCRUD(GenericCRUD):
 
         try:
             self.cursor.execute("BEGIN")
-            
-            # Update template name
+
+            # 1. Update template name
             normalized_template_name = normalize_text(new_template_name)
             self.cursor.execute(
                 "UPDATE transaction_templates SET name = ?, normalized_name = ? WHERE id = ?",
                 (new_template_name, normalized_template_name, template_id)
             )
 
-            # Delete existing transactions and details
+            # 2. Delete existing *details* first (important for avoiding foreign key issues)
+            self.cursor.execute("""
+                DELETE FROM template_transaction_details
+                WHERE template_transaction_id IN (
+                    SELECT id FROM template_transactions WHERE template_id = ?
+                )""", (template_id,))
+
+            # 3. Now delete the template_transactions
             self.cursor.execute(
                 "DELETE FROM template_transactions WHERE template_id = ?",
                 (template_id,)
             )
 
-            # Insert updated transactions
+            # 4. Insert updated transactions (and details)
             for transaction in self.transaction_data:
                 self.cursor.execute(
                     "INSERT INTO template_transactions (template_id, description) VALUES (?, ?)",
                     (template_id, transaction['description'])
                 )
                 template_transaction_id = self.cursor.lastrowid
-                
+                # Check if 'id' exists in the transaction dictionary.  If not,
+                # it's a new transaction, and we should NOT try to insert an ID.
+
                 self.cursor.execute(
                     """INSERT INTO template_transaction_details 
                     (template_transaction_id, debited, credited, amount) 
                     VALUES (?, ?, ?, ?)""",
-                    (template_transaction_id, transaction['debited'], 
+                    (template_transaction_id, transaction['debited'],
                     transaction['credited'], float(transaction['amount']))
                 )
 
@@ -306,7 +315,7 @@ class TemplateTransactionCRUD(GenericCRUD):
         # Ensure we're using Row factory for this connection
         self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor()
-        
+
         self.cursor.execute("SELECT * FROM transaction_templates")
         templates = self.cursor.fetchall()
 
@@ -379,7 +388,7 @@ class TemplateTransactionCRUD(GenericCRUD):
                 return
 
             template_id = selected_template['id']
-            
+
             # Create edit dialog
             dialog = QDialog(main_window)
             dialog.setWindowTitle("Edit Transaction Template")
@@ -413,9 +422,9 @@ class TemplateTransactionCRUD(GenericCRUD):
                 JOIN accounts ca ON ttd.credited = ca.id
                 WHERE tt.template_id = ?
             """, (template_id,))
-            
+
             existing_transactions = self.cursor.fetchall()
-            
+
             for trans in existing_transactions:
                 transaction = {
                     'id': trans['id'],
@@ -427,7 +436,7 @@ class TemplateTransactionCRUD(GenericCRUD):
                     'credited_display': f"{trans['credit_name']} ({trans['credit_code']})"
                 }
                 self.transaction_data.append(transaction)
-            
+
             self._update_transactions_table()
 
             # Add transaction button
@@ -455,8 +464,7 @@ class TemplateTransactionCRUD(GenericCRUD):
         )
         if search_dialog.exec() == QDialog.Accepted:
             selected_item = search_dialog.get_selected_item()
-            if not selected_item:
-                return
+            if not selected_item: return
 
             template_id = selected_item['id']
             confirm = QMessageBox.question(
@@ -468,11 +476,68 @@ class TemplateTransactionCRUD(GenericCRUD):
                 try:
                     # Use a transaction for atomicity (all or nothing)
                     self.cursor.execute("BEGIN")
-                    # The ON DELETE CASCADE in the database schema will handle deleting
-                    # related records in template_transactions and template_transaction_details.
+
+                    # Delete details first (due to foreign key constraint)
+                    self.cursor.execute("""
+                        DELETE FROM template_transaction_details
+                        WHERE template_transaction_id IN (
+                            SELECT id FROM template_transactions WHERE template_id = ?
+                        )""", (template_id,))
+
+                    # Now delete from template_transactions
+                    self.cursor.execute("DELETE FROM template_transactions WHERE template_id = ?", (template_id,))
+
+                    # Finally, delete the template itself
                     self.cursor.execute("DELETE FROM transaction_templates WHERE id = ?", (template_id,))
+
+
                     self.conn.commit()
                     QMessageBox.information(main_window, "Success", "Template and transactions deleted successfully!")
                 except sqlite3.Error as e:
                     self.conn.rollback()
                     QMessageBox.critical(main_window, "Database Error", str(e))
+
+    def _save_template(self, dialog, template_name):
+        """Saves a new template and its transactions."""
+        if not template_name.strip():
+            QMessageBox.warning(dialog, "Error", "Template name cannot be empty.")
+            return
+        if not self.transaction_data:
+            QMessageBox.warning(dialog, "Error", "At least one transaction is required.")
+            return
+
+        try:
+            self.cursor.execute("BEGIN")
+
+            # Insert the template itself
+            normalized_template_name = normalize_text(template_name)
+            self.cursor.execute(
+                "INSERT INTO transaction_templates (name, normalized_name) VALUES (?, ?)",
+                (template_name, normalized_template_name)
+            )
+            template_id = self.cursor.lastrowid
+
+            # Insert the individual transactions
+            for transaction in self.transaction_data:
+                self.cursor.execute(
+                    "INSERT INTO template_transactions (template_id, description) VALUES (?, ?)",
+                    (template_id, transaction['description'])
+                )
+                template_transaction_id = self.cursor.lastrowid
+
+                # Insert transaction details (debit, credit, amount)
+                self.cursor.execute(
+                    """INSERT INTO template_transaction_details 
+                    (template_transaction_id, debited, credited, amount) 
+                    VALUES (?, ?, ?, ?)""",
+                    (template_transaction_id, transaction['debited'],
+                     transaction['credited'], float(transaction['amount']))
+                )
+
+            self.conn.commit()
+            QMessageBox.information(dialog, "Success", "Template created successfully!")
+            dialog.accept()  # Use accept() for successful completion
+
+        except sqlite3.Error as e:
+            self.conn.rollback()
+            QMessageBox.critical(dialog, "Database Error", str(e))
