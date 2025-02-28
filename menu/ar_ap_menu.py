@@ -3,12 +3,14 @@
 from PySide6.QtWidgets import QMenu
 from PySide6.QtGui import QAction
 from ar_ap.settings import ARAPSettingsWindow
+from ar_ap.new_ar_ap import NewDebtorCreditorWindow
 
 
 class ARPActions:  # Renamed for clarity, as it handles both AR and AP
     def __init__(self, main_window):
         self.main_window = main_window
         self.ar_ap_menu = self.create_ar_ap_menu()
+        
 
     def create_ar_ap_menu(self):
         ar_ap_menu = QMenu("AR/AP", self.main_window)
@@ -24,7 +26,10 @@ class ARPActions:  # Renamed for clarity, as it handles both AR and AP
 
         # --- Debtor Creditor Management Submenu ---
         debtor_creditor_management_menu = QMenu("Debtor/Creditor Management", ar_ap_menu)
+
         new_debtor_creditor_action = QAction("New Debtor/Creditor", self.main_window)
+        new_debtor_creditor_action.triggered.connect(self.open_new_debtor_creditor)
+
         edit_debtor_creditor_action = QAction("Edit Debtor/Creditor", self.main_window)
         delete_debtor_creditor_action = QAction("Delete Debtor/Creditor", self.main_window)
         debtor_creditor_management_menu.addAction(new_debtor_creditor_action)
@@ -68,3 +73,9 @@ class ARPActions:  # Renamed for clarity, as it handles both AR and AP
         """Opens the AR/AP settings window."""
         self.settings_window = ARAPSettingsWindow(self.main_window)
         self.settings_window.show()
+
+    def open_new_debtor_creditor(self): #new function
+        """Opens the new debtor/creditor window."""
+        self.new_dc_window = NewDebtorCreditorWindow(self.main_window)
+        self.new_dc_window.show()
+        

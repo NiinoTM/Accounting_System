@@ -119,8 +119,8 @@ class DatabaseManager:
         -- Debtors/Creditors
         CREATE TABLE IF NOT EXISTS debtor_creditor (
             id INTEGER PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
-            normalized_name VARCHAR(100) NOT NULL,
+            name VARCHAR(100) NOT NULL UNIQUE,
+            normalized_name VARCHAR(100) NOT NULL UNIQUE,
             account INTEGER,
             amount DECIMAL(15, 2),
             FOREIGN KEY (account) REFERENCES accounts(id)
