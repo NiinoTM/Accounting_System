@@ -88,33 +88,6 @@ class DatabaseManager:
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
-        -- Debts and Credits
-        CREATE TABLE IF NOT EXISTS debt_credit_records (
-            id INTEGER PRIMARY KEY,
-            party_name VARCHAR(100) NOT NULL,
-            description TEXT,
-            type VARCHAR(20) NOT NULL,
-            amount DECIMAL(15,2) NOT NULL,
-            remaining_amount DECIMAL(15,2) NOT NULL,
-            due_date DATE,
-            status VARCHAR(20) DEFAULT 'ACTIVE',
-            related_account_id INTEGER REFERENCES accounts(id),
-            notes TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-
-        -- Payment/Collection History
-        CREATE TABLE IF NOT EXISTS payment_history (
-            id INTEGER PRIMARY KEY,
-            debt_credit_id INTEGER REFERENCES debt_credit_records(id),
-            amount DECIMAL(15,2) NOT NULL,
-            payment_date DATE NOT NULL,
-            payment_method VARCHAR(50),
-            notes TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-
         -- Assets register
         CREATE TABLE IF NOT EXISTS assets (
             id INTEGER PRIMARY KEY,
@@ -141,6 +114,24 @@ class DatabaseManager:
             last_depreciation_date DATE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        -- Debtors/Creditors
+        CREATE TABLE IF NOT EXISTS debtor_creditor (
+            id INTEGER PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            normalized_name VARCHAR(100) NOT NULL,
+            account INTEGER,
+            amount DECIMAL(15, 2),
+            FOREIGN KEY (account) REFERENCES accounts(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS debtor_creditor_transactions (
+            id INTEGER PRIMARY KEY,
+            date DATE NOT NULL,
+            details TEXT,
+            option VARCHAR(100),
+            amount DECIMAL(15, 2)
         );
 
         -- Transactions
@@ -170,7 +161,6 @@ class DatabaseManager:
             FOREIGN KEY (template_id) REFERENCES transaction_templates(id) ON DELETE CASCADE
         );
 
-        -- Changed debit_account and credit_account to debited and credited
         CREATE TABLE IF NOT EXISTS template_transaction_details (
             id INTEGER PRIMARY KEY,
             template_transaction_id INTEGER NOT NULL,

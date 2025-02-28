@@ -2,6 +2,7 @@
 
 from PySide6.QtWidgets import QMenu
 from PySide6.QtGui import QAction
+from ar_ap.settings import ARAPSettingsWindow
 
 
 class ARPActions:  # Renamed for clarity, as it handles both AR and AP
@@ -18,8 +19,10 @@ class ARPActions:  # Renamed for clarity, as it handles both AR and AP
 
         # --- Settings Submenu ---
         settings_action = QAction("Settings", ar_ap_menu)
+        settings_action.triggered.connect(self.open_settings)
         ar_ap_menu.addAction(settings_action)
 
+        # --- Debtor Creditor Management Submenu ---
         debtor_creditor_management_menu = QMenu("Debtor/Creditor Management", ar_ap_menu)
         new_debtor_creditor_action = QAction("New Debtor/Creditor", self.main_window)
         edit_debtor_creditor_action = QAction("Edit Debtor/Creditor", self.main_window)
@@ -60,3 +63,8 @@ class ARPActions:  # Renamed for clarity, as it handles both AR and AP
         ar_ap_menu.addMenu(creditor_transactions_menu)
 
         return ar_ap_menu
+    
+    def open_settings(self):
+        """Opens the AR/AP settings window."""
+        self.settings_window = ARAPSettingsWindow(self.main_window)
+        self.settings_window.show()
