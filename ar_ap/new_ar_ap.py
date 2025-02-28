@@ -47,7 +47,7 @@ class NewDebtorCreditorWindow(QWidget):
             QMessageBox.warning(self, "Error", "Name cannot be empty.")
             return
 
-        account_type = 1 if self.debtor_radio.isChecked() else 2  # 1 for Debtor, 2 for Creditor
+        account_type = 1 if self.debtor_radio.isChecked() else 2  # 1 for Debtor, 2 for Creditor    
         normalized_name = normalize_text(name)
 
         try:
