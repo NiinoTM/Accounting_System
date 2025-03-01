@@ -2,11 +2,15 @@
 
 from PySide6.QtWidgets import QMenu
 from PySide6.QtGui import QAction
+
 from ar_ap.settings import ARAPSettingsWindow
+
 from ar_ap.new_ar_ap import NewDebtorCreditorWindow
 from ar_ap.edit_ar_ap import EditDebtorCreditorWindow
 from ar_ap.delete_ar_ap import DeleteDebtorCreditorWindow
 
+from ar_ap.register_asset_transfer_outflow import RegisterAssetTransferOutflowWindow
+from ar_ap.record_asset_recovery import RecordAssetRecoveryWindow
 
 class ARPActions:  # Renamed for clarity, as it handles both AR and AP
     def __init__(self, main_window):
@@ -48,7 +52,11 @@ class ARPActions:  # Renamed for clarity, as it handles both AR and AP
         debtor_transactions_menu = QMenu("Debtor Transactions", ar_ap_menu)
 
         register_asset_transfer_out_action = QAction("Register Asset Transfer (Outflow)", self.main_window)
+        register_asset_transfer_out_action.triggered.connect(self.open_register_asset_transfer_outflow)
+        
         record_asset_recovery_action = QAction("Record Asset Recovery (Inflow)", self.main_window)
+        record_asset_recovery_action.triggered.connect(self.open_record_asset_recovery)
+
         adjust_receivable_action = QAction("Adjust Receivable", self.main_window)
         write_off_receivable_action = QAction("Write-Off Receivable", self.main_window)
 
@@ -93,3 +101,13 @@ class ARPActions:  # Renamed for clarity, as it handles both AR and AP
         """Opens the delete debtor/creditor window."""
         self.delete_dc_window = DeleteDebtorCreditorWindow(self.main_window)
         self.delete_dc_window.show()
+
+    def open_register_asset_transfer_outflow(self):  # New method
+        """Opens the register asset transfer outflow window."""
+        self.register_outflow_window = RegisterAssetTransferOutflowWindow(self.main_window)
+        self.register_outflow_window.show()
+
+    def open_record_asset_recovery(self):
+        """Opens the record asset recovery inflow window."""
+        self.record_asset_recovery_window = RecordAssetRecoveryWindow(self.main_window)
+        self.record_asset_recovery_window.show()

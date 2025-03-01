@@ -130,8 +130,10 @@ class DatabaseManager:
             id INTEGER PRIMARY KEY,
             date DATE NOT NULL,
             details TEXT,
-            option VARCHAR(100),
-            amount DECIMAL(15, 2)
+            amount DECIMAL(15, 2),
+            debtor_creditor INTEGER NOT NULL,
+            type VARCHAR(20) NOT NULL,  -- Added 'type' column
+            FOREIGN KEY (debtor_creditor) REFERENCES debtor_creditor(id)
         );
 
         -- Transactions
