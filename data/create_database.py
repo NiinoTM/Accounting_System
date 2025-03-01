@@ -88,34 +88,6 @@ class DatabaseManager:
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
-        -- Assets register
-        CREATE TABLE IF NOT EXISTS assets (
-            id INTEGER PRIMARY KEY,
-            name VARCHAR(100) NOT NULL UNIQUE,
-            description TEXT,
-            purchase_date DATE NOT NULL,
-            purchase_cost DECIMAL(15,2) NOT NULL,
-            asset_account_id INTEGER REFERENCES accounts(id),
-            current_value DECIMAL(15,2),
-            status VARCHAR(20) DEFAULT 'ACTIVE',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-
-        -- Depreciation Schedule
-        CREATE TABLE IF NOT EXISTS depreciation (
-            id INTEGER PRIMARY KEY,
-            asset_id INTEGER REFERENCES assets(id),
-            depreciation_method VARCHAR(50),
-            useful_life_years INTEGER NOT NULL,
-            salvage_value DECIMAL(15,2),
-            annual_rate DECIMAL(5,2),
-            accumulated_depreciation DECIMAL(15,2) DEFAULT 0.00,
-            last_depreciation_date DATE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-
         -- Debtors/Creditors
         CREATE TABLE IF NOT EXISTS debtor_creditor (
             id INTEGER PRIMARY KEY,
@@ -134,6 +106,40 @@ class DatabaseManager:
             debtor_creditor INTEGER NOT NULL,
             type VARCHAR(20) NOT NULL,  -- Added 'type' column
             FOREIGN KEY (debtor_creditor) REFERENCES debtor_creditor(id)
+        );
+
+        -- Fixed Assets Table (Modified - Removed calculated fields)
+        CREATE TABLE IF NOT EXISTS fixed_assets (
+            asset_id INTEGER PRIMARY KEY,
+            asset_name VARCHAR(255) NOT NULL,
+            account_id INTEGER NOT NULL,
+            purchase_date DATE NOT NULL,
+            original_cost DECIMAL(19, 4) NOT NULL,
+            salvage_value DECIMAL(19, 4) NOT NULL,
+            depreciation_method TEXT NOT NULL,
+            useful_life_years INTEGER,  -- Keep for initial setup
+            depreciation_rate DECIMAL(5, 4), -- Keep for initial setup and DB, DDB
+            total_estimated_units INTEGER,  -- Keep for Units of Production
+            disposal_price DECIMAL(19, 4),
+            disposal_date DATE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (account_id) REFERENCES accounts(id)
+        );
+
+        -- Depreciation Schedule Table (NEW)
+        CREATE TABLE IF NOT EXISTS depreciation_schedule (
+            schedule_id INTEGER PRIMARY KEY,
+            asset_id INTEGER NOT NULL,
+            period_start_date DATE NOT NULL,  -- Start of the period
+            period_end_date DATE NOT NULL,    -- End of the period
+            depreciation_expense DECIMAL(19, 4) NOT NULL,
+            accumulated_depreciation DECIMAL(19, 4) NOT NULL,
+            book_value DECIMAL(19, 4) NOT NULL,  -- Book value at period end
+            units_produced_period INTEGER,  --  Units produced THIS period (for UP method)
+            transaction_id INTEGER,           -- Link to the transaction that records this depreciation
+            FOREIGN KEY (asset_id) REFERENCES fixed_assets(asset_id),
+            FOREIGN KEY (transaction_id) REFERENCES transactions(id)
         );
 
         -- Transactions

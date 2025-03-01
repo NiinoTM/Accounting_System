@@ -8,6 +8,7 @@ from menu.transactions_actions import TransactionsActions
 from menu.templates_actions import TemplatesActions
 from menu.reports_actions import ReportsActions
 from menu.ar_ap_menu import ARPActions
+from menu.fixed_asset_menu import FixedAssetActions
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -15,8 +16,9 @@ class MainWindow(QMainWindow):
         self.setup_actions = SetupActions(self)
         self.transactions_actions = TransactionsActions(self)
         self.templates_actions = TemplatesActions(self)
-        self.reports_actions = ReportsActions(self)
         self.ar_ap_actions = ARPActions(self)
+        self.reports_actions = ReportsActions(self)
+        self.fixed_assets_actions = FixedAssetActions(self)
 
         self.init_ui()
         self.create_menu()
@@ -43,14 +45,16 @@ class MainWindow(QMainWindow):
         templates_menu = self.templates_actions.templates_menu
         menubar.addMenu(templates_menu)
 
+            #ACCOUNTS RECEIVABLES & PAYABLES
+        ar_ap_menu = self.ar_ap_actions.ar_ap_menu
+        menubar.addMenu(ar_ap_menu)
+
             # REPORTS
         reports_menu = self.reports_actions.reports_menu  # Get the reports menu
         menubar.addMenu(reports_menu) # Add the created reports menu
 
-        assets_menu = menubar.addMenu("Fixed Assets")
-
-        ar_ap_menu = self.ar_ap_actions.ar_ap_menu
-        menubar.addMenu(ar_ap_menu)
+        fixed_asset_menu = self.fixed_assets_actions.fixed_asset_menu
+        menubar.addMenu(fixed_asset_menu)
 
 
         backup_menu = menubar.addMenu("Backups")
