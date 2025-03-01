@@ -156,6 +156,20 @@ class DatabaseManager:
             FOREIGN KEY (credited) REFERENCES accounts(id)
         );
 
+        -- New table Future Transactions
+        CREATE TABLE IF NOT EXISTS future_transactions (
+            id INTEGER PRIMARY KEY,
+            date TEXT NOT NULL,
+            description TEXT,
+            debited INTEGER NOT NULL,
+            credited INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (debited) REFERENCES accounts(id),
+            FOREIGN KEY (credited) REFERENCES accounts(id)
+        );
+
         CREATE TABLE IF NOT EXISTS transaction_templates (
             id INTEGER PRIMARY KEY,
             name VARCHAR(100) NOT NULL UNIQUE,
