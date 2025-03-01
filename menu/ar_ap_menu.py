@@ -19,6 +19,8 @@ from ar_ap.record_liability_settlement import RecordLiabilitySettlementWindow
 from ar_ap.adjust_payable import AdjustPayableWindow
 from ar_ap.cancel_payable import CancelPayableWindow
 
+from ar_ap.view_outstanding_balance import OutstandingBalanceWindow
+
 class ARPActions:  # Renamed for clarity, as it handles both AR and AP
     def __init__(self, main_window):
         self.main_window = main_window
@@ -30,6 +32,7 @@ class ARPActions:  # Renamed for clarity, as it handles both AR and AP
 
         # --- View Submenu ---
         view_outstanding_balances_action = QAction("View Outstanding Balances", ar_ap_menu)
+        view_outstanding_balances_action.triggered.connect(self.view_outstanding_balance)
         ar_ap_menu.addAction(view_outstanding_balances_action)
 
         # --- Settings Submenu ---
@@ -159,3 +162,7 @@ class ARPActions:  # Renamed for clarity, as it handles both AR and AP
         """Opens the cancel payable window."""
         self.cancel_payable_window = CancelPayableWindow(self.main_window)
         self.cancel_payable_window.show()
+
+    def view_outstanding_balance(self):  # New method
+        self.view_outstanding_balance_window = OutstandingBalanceWindow(self.main_window)
+        self.view_outstanding_balance_window.show()
