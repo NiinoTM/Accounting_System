@@ -1,0 +1,369 @@
+# fixed_assets/single_account_purchase.py
+
+import sqlite3
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton,
+                               QMessageBox, QHBoxLayout, QDialog, QComboBox)
+from PySide6.QtCore import QDate
+from data.create_database import DatabaseManager
+from utils.crud.date_select import DateSelectWindow
+from utils.crud.search_dialog import AdvancedSearchDialog
+from utils.formatters import format_table_name, normalize_text
+from utils.depreciation_methods import calculate_depreciation
+from datetime import datetime
+
+class SingleAccountPurchaseWindow(QWidget):
+    def __init__(self, main_window):
+        super().__init__()
+        self.main_window = main_window
+        self.setWindowTitle("Single Account Asset Purchase")
+        self.db_manager = DatabaseManager()
+        self.selected_account = None
+        self.selected_payment_account = None  # Store selected payment account
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+
+        # Asset Name
+        name_layout = QHBoxLayout()
+        self.name_label = QLabel("Asset Name:")
+        self.name_input = QLineEdit()
+        name_layout.addWidget(self.name_label)
+        name_layout.addWidget(self.name_input)
+        layout.addLayout(name_layout)
+
+        # Asset Code
+        code_layout = QHBoxLayout()
+        self.code_label = QLabel("Asset Code:")
+        self.code_input = QLineEdit()
+        code_layout.addWidget(self.code_label)
+        code_layout.addWidget(self.code_input)
+        layout.addLayout(code_layout)
+
+        # Purchase Date
+        date_layout = QHBoxLayout()
+        self.date_label = QLabel("Purchase Date:")
+        self.date_input = QLineEdit()
+        self.date_input.setReadOnly(True)
+        self.date_button = QPushButton("Select Date")
+        self.date_button.clicked.connect(self.select_date)
+        date_layout.addWidget(self.date_label)
+        date_layout.addWidget(self.date_input)
+        date_layout.addWidget(self.date_button)
+        layout.addLayout(date_layout)
+
+        # Original Cost
+        cost_layout = QHBoxLayout()
+        self.cost_label = QLabel("Original Cost:")
+        self.cost_input = QLineEdit()
+        cost_layout.addWidget(self.cost_label)
+        cost_layout.addWidget(self.cost_input)
+        layout.addLayout(cost_layout)
+
+        # Salvage Value
+        salvage_layout = QHBoxLayout()
+        self.salvage_label = QLabel("Salvage Value:")
+        self.salvage_input = QLineEdit()
+        salvage_layout.addWidget(self.salvage_label)
+        salvage_layout.addWidget(self.salvage_input)
+        layout.addLayout(salvage_layout)
+
+        # Depreciation Method
+        method_layout = QHBoxLayout()
+        self.method_label = QLabel("Depreciation Method:")
+        self.method_combo = QComboBox()
+        self.method_combo.addItems([
+            'Straight-Line',
+            "Sum of the Years' Digit",
+            'Declining Balance',
+            'Double-Declining Balance',
+            'Units of Production'
+        ])
+        self.method_combo.currentTextChanged.connect(self.update_depreciation_fields)
+        method_layout.addWidget(self.method_label)
+        method_layout.addWidget(self.method_combo)
+        layout.addLayout(method_layout)
+
+        # --- Dynamic Fields (Useful Life, Depreciation Rate, Units) ---
+        self.dynamic_fields_layout = QVBoxLayout()
+        layout.addLayout(self.dynamic_fields_layout)
+        self.update_depreciation_fields() # set up on load
+
+        # Payment Account Selection
+        payment_account_layout = QHBoxLayout()
+        self.payment_account_label = QLabel("Payment Account:")
+        self.payment_account_input = QLineEdit()
+        self.payment_account_input.setReadOnly(True)
+        self.payment_account_button = QPushButton("Select Account")
+        self.payment_account_button.clicked.connect(self.select_payment_account)
+        payment_account_layout.addWidget(self.payment_account_label)
+        payment_account_layout.addWidget(self.payment_account_input)
+        payment_account_layout.addWidget(self.payment_account_button)
+        layout.addLayout(payment_account_layout)
+
+        # Purchase Button
+        self.purchase_button = QPushButton("Register Purchase")
+        self.purchase_button.clicked.connect(self.register_purchase)
+        layout.addWidget(self.purchase_button)
+
+        self.setLayout(layout)
+
+    def select_date(self):
+        date_dialog = DateSelectWindow()
+        if date_dialog.exec() == QDialog.Accepted:
+            self.date_input.setText(date_dialog.calendar.selectedDate().toString('yyyy-MM-dd'))
+
+    def select_payment_account(self):
+        search_dialog = AdvancedSearchDialog(
+            field_type='generic',
+            parent=self,
+            db_path=self.db_manager.db_path,
+            table_name='accounts',
+            additional_filter="type_id IN (1, 2)"  # Current and Fixed Assets
+        )
+        if search_dialog.exec() == QDialog.Accepted:
+            selected = search_dialog.get_selected_item()
+            if selected:
+                self.selected_payment_account = selected
+                self.payment_account_input.setText(f"{selected['name']} ({selected['code']})")
+
+    def update_depreciation_fields(self):
+        method = self.method_combo.currentText()
+
+        for i in reversed(range(self.dynamic_fields_layout.count())):
+            widget = self.dynamic_fields_layout.itemAt(i).widget()
+            if widget is not None:
+                widget.deleteLater()
+
+        self.useful_life_label = None
+        self.useful_life_input = None
+        self.depreciation_rate_label = None
+        self.depreciation_rate_input = None
+        self.units_produced_label = None
+        self.units_produced_input = None
+        self.total_units_label = None
+        self.total_units_input = None
+
+        if method in ('Straight-Line', "Sum of the Years' Digit"):
+            self.useful_life_label = QLabel("Useful Life (Years):")
+            self.useful_life_input = QLineEdit()
+            self.dynamic_fields_layout.addWidget(self.useful_life_label)
+            self.dynamic_fields_layout.addWidget(self.useful_life_input)
+
+        elif method in ('Declining Balance', 'Double-Declining Balance'):
+            self.useful_life_label = QLabel("Useful Life (Years):")
+            self.useful_life_input = QLineEdit()
+            self.depreciation_rate_label = QLabel("Depreciation Rate:")
+            self.depreciation_rate_input = QLineEdit()
+            self.dynamic_fields_layout.addWidget(self.useful_life_label)
+            self.dynamic_fields_layout.addWidget(self.useful_life_input)
+            self.dynamic_fields_layout.addWidget(self.depreciation_rate_label)
+            self.dynamic_fields_layout.addWidget(self.depreciation_rate_input)
+
+        elif method == 'Units of Production':
+            self.total_units_label = QLabel("Total Estimated Units:")
+            self.total_units_input = QLineEdit()
+            self.dynamic_fields_layout.addWidget(self.total_units_label)
+            self.dynamic_fields_layout.addWidget(self.total_units_input)
+
+    def import_asset(self):
+        if not self.selected_account or not self.date_input.text() or not self.cost_input.text() or not self.salvage_input.text():
+            QMessageBox.warning(self, "Error", "Please fill in all required fields.")
+            return
+        try:
+            original_cost = float(self.cost_input.text())
+            salvage_value = float(self.salvage_input.text())
+            if original_cost <= 0 or salvage_value < 0 or salvage_value >= original_cost:
+                raise ValueError("Cost must be positive, and salvage value cannot be negative or greater/equal to cost.")
+        except ValueError as e:
+            QMessageBox.warning(self, "Error", str(e))  # Show specific error
+            return
+
+        asset_name = self.selected_account['name']
+        account_id = self.selected_account['id']
+        purchase_date = self.date_input.text()
+        depreciation_method = self.method_combo.currentText()
+
+        useful_life_years = None
+        depreciation_rate = None
+        units_produced_period = None  # Not needed at *import* time
+        total_estimated_units = None
+
+        # Dynamic field validation and value retrieval (as before)
+        if depreciation_method in ('Straight-Line', "Sum of the Years' Digit"):
+            try:
+                useful_life_years = int(self.useful_life_input.text())
+                if useful_life_years <= 0:
+                    raise ValueError("Useful life must be positive.")
+            except (ValueError, TypeError):
+                QMessageBox.warning(self, "Error", "Please enter a valid integer for useful life.")
+                return
+
+        elif depreciation_method in ('Declining Balance', 'Double-Declining Balance'):
+            try:
+                useful_life_years = int(self.useful_life_input.text())
+                depreciation_rate = float(self.depreciation_rate_input.text())
+                if useful_life_years <= 0 or depreciation_rate <= 0 or depreciation_rate > 1 :
+                    raise ValueError("Useful life must be positive, and depreciation rate must be between 0 and 1.")
+            except (ValueError, TypeError):
+                QMessageBox.warning(self, "Error", "Please enter valid values for useful life and depreciation rate.")
+                return
+
+        elif depreciation_method == 'Units of Production':
+            try:
+                total_estimated_units = int(self.total_units_input.text())
+                if total_estimated_units <= 0:
+                    raise ValueError
+            except (ValueError, TypeError):
+                QMessageBox.warning(self, "Error", "Please enter a valid integer value for Total Estimated Units.")
+                return
+
+        try:
+            with self.db_manager as db:
+                # --- Check for Duplicate Account ---
+                db.cursor.execute("SELECT asset_id FROM fixed_assets WHERE account_id = ?", (account_id,))
+                if db.cursor.fetchone():
+                    QMessageBox.critical(self, "Error", "This account has already been imported as a fixed asset.")
+                    return
+                # Insert into fixed_assets (without current_value or units_produced_period)
+                db.cursor.execute(
+                    """
+                    INSERT INTO fixed_assets (
+                        asset_name, account_id, purchase_date, original_cost,
+                        salvage_value, depreciation_method, useful_life_years,
+                        depreciation_rate, total_estimated_units
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (asset_name, account_id, purchase_date, original_cost,
+                     salvage_value, depreciation_method, useful_life_years,
+                     depreciation_rate, total_estimated_units)
+                )
+                db.commit()
+                QMessageBox.information(self, "Success", "Fixed asset imported successfully!")
+                self.close()
+
+        except sqlite3.Error as e:
+            db.conn.rollback()
+            QMessageBox.critical(self, "Database Error", str(e))
+
+    def register_purchase(self):
+      if (not self.date_input.text() or not self.cost_input.text()
+              or not self.salvage_input.text() or not self.name_input.text()
+              or not self.code_input.text() or not self.selected_payment_account):
+          QMessageBox.warning(self, "Error", "Please fill in all required fields.")
+          return
+
+      try:
+          original_cost = float(self.cost_input.text())
+          salvage_value = float(self.salvage_input.text())
+          if original_cost <= 0 or salvage_value < 0 or salvage_value >= original_cost:
+              raise ValueError
+      except ValueError:
+          QMessageBox.warning(self, "Error", "Invalid numeric values for cost or salvage value.")
+          return
+
+      asset_name = self.name_input.text().strip()
+      asset_code = self.code_input.text().strip()
+      purchase_date = self.date_input.text()
+      depreciation_method = self.method_combo.currentText()
+
+      useful_life_years = None
+      depreciation_rate = None
+      total_estimated_units = None
+
+      if depreciation_method in ('Straight-Line', "Sum of the Years' Digit"):
+          try:
+              useful_life_years = int(self.useful_life_input.text())
+              if useful_life_years <= 0:
+                  raise ValueError("Useful life must be positive.")
+          except (ValueError, TypeError):
+              QMessageBox.warning(self, "Error", "Please enter a valid integer for useful life.")
+              return
+
+      elif depreciation_method in ('Declining Balance', 'Double-Declining Balance'):
+          try:
+              useful_life_years = int(self.useful_life_input.text())
+              depreciation_rate = float(self.depreciation_rate_input.text())
+              if useful_life_years <= 0 or depreciation_rate <= 0 or depreciation_rate > 1:
+                  raise ValueError("Useful life must be positive, and depreciation rate must be between 0 and 1.")
+          except (ValueError, TypeError):
+              QMessageBox.warning(self, "Error", "Please enter valid values for useful life and depreciation rate.")
+              return
+
+      elif depreciation_method == 'Units of Production':
+          try:
+              total_estimated_units = int(self.total_units_input.text())
+              if total_estimated_units <= 0:
+                  raise ValueError
+          except (ValueError, TypeError):
+              QMessageBox.warning(self, "Error", "Please enter a valid integer value for Total Estimated Units.")
+              return
+
+      try:
+          with self.db_manager as db:
+                # --- Create the Account ---
+                db.cursor.execute(
+                  """
+                  INSERT INTO accounts (code, name, normalized_name, type_id, is_active)
+                  VALUES (?, ?, ?, 2, 1)
+                  """,
+                  (asset_code, asset_name, normalize_text(asset_name))
+                )
+                account_id = db.cursor.lastrowid
+
+                # --- Check for Duplicate Account (after creating the account)---
+                db.cursor.execute("SELECT asset_id FROM fixed_assets WHERE account_id = ?", (account_id,))
+                if db.cursor.fetchone():
+                    QMessageBox.critical(self, "Error", "This account has already been imported as a fixed asset.")
+                    db.conn.rollback()  # Rollback account creation
+                    return
+                # --- Insert into fixed_assets ---
+                db.cursor.execute(
+                    """
+                    INSERT INTO fixed_assets (
+                        asset_name, account_id, purchase_date, original_cost,
+                        salvage_value, depreciation_method, useful_life_years,
+                        depreciation_rate, total_estimated_units
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (asset_name, account_id, purchase_date, original_cost,
+                     salvage_value, depreciation_method, useful_life_years,
+                     depreciation_rate, total_estimated_units)
+                )
+                asset_id = db.cursor.lastrowid
+
+                # --- Create Purchase Transaction ---
+                db.cursor.execute(
+                    """
+                    INSERT INTO transactions (date, description, debited, credited, amount)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (purchase_date, f"{asset_name} - Purchase", account_id, self.selected_payment_account['id'], original_cost)
+                )
+                transaction_id = db.cursor.lastrowid
+
+
+                # --- Update Account Balances ---
+                db.cursor.execute("UPDATE accounts SET balance = balance + ? WHERE id = ?", (original_cost, account_id))
+                db.cursor.execute("UPDATE accounts SET balance = balance - ? WHERE id = ?", (original_cost, self.selected_payment_account['id']))
+
+                db.commit()
+                QMessageBox.information(self, "Success", "Fixed asset purchased and registered successfully!")
+                self.close()
+
+      except sqlite3.IntegrityError as e:
+            db.conn.rollback()
+            if "UNIQUE constraint failed: accounts.code" in str(e):
+                QMessageBox.critical(self, "Database Error", "An account with this code already exists.")
+            elif "UNIQUE constraint failed: accounts.name" in str(e):
+                QMessageBox.critical(self, "Database Error", "An account with this name already exists.")
+            elif "UNIQUE constraint failed: accounts.normalized_name" in str(e):
+                 QMessageBox.critical(self, "Database Error", "An account with this name already exists.")
+            else:
+                QMessageBox.critical(self, "Database Error", str(e))
+
+      except (sqlite3.Error, Exception) as e:
+          db.conn.rollback()
+          QMessageBox.critical(self, "Error", str(e))
