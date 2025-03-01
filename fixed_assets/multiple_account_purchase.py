@@ -4,13 +4,13 @@ import sqlite3
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton,
                                QMessageBox, QHBoxLayout, QDialog, QComboBox,
                                QTableWidget, QTableWidgetItem, QAbstractItemView, QDialogButtonBox)
-from PySide6.QtCore import QDate
-from PySide6.QtGui import Qt
+from PySide6.QtCore import QDate, Qt
 from data.create_database import DatabaseManager
 from utils.crud.date_select import DateSelectWindow
 from utils.crud.search_dialog import AdvancedSearchDialog
 from utils.formatters import format_table_name, normalize_text
-from utils.depreciation_methods import calculate_depreciation  # Import
+from utils.depreciation_methods import calculate_depreciation
+
 
 class MultipleAccountPurchaseWindow(QWidget):
     def __init__(self, main_window):
@@ -100,6 +100,7 @@ class MultipleAccountPurchaseWindow(QWidget):
         add_account_button.clicked.connect(self.add_account)
         layout.addWidget(add_account_button)
 
+
         # Purchase Button
         self.purchase_button = QPushButton("Register Purchase")
         self.purchase_button.clicked.connect(self.register_purchase)
@@ -115,12 +116,11 @@ class MultipleAccountPurchaseWindow(QWidget):
     def update_depreciation_fields(self):
         method = self.method_combo.currentText()
 
-        # Clear existing dynamic fields (same as in import_fixed_asset.py)
         for i in reversed(range(self.dynamic_fields_layout.count())):
             widget = self.dynamic_fields_layout.itemAt(i).widget()
             if widget is not None:
                 widget.deleteLater()
-        # Reset labels
+
         self.useful_life_label = None
         self.useful_life_input = None
         self.depreciation_rate_label = None
@@ -151,7 +151,6 @@ class MultipleAccountPurchaseWindow(QWidget):
             self.total_units_input = QLineEdit()
             self.dynamic_fields_layout.addWidget(self.total_units_label)
             self.dynamic_fields_layout.addWidget(self.total_units_input)
-
     def add_account(self):
         """Opens a dialog to select an account and enter the amount."""
         dialog = QDialog(self)
@@ -177,7 +176,7 @@ class MultipleAccountPurchaseWindow(QWidget):
                 parent=dialog,
                 db_path=self.db_manager.db_path,
                 table_name='accounts',
-                additional_filter="type_id IN (1, 2)"  # Current and Fixed Assets
+                additional_filter="type_id IN (1, 2, 3, 4)"  # Include Liabilities
             )
             if search_dialog.exec() == QDialog.Accepted:
                 selected = search_dialog.get_selected_item()
@@ -324,7 +323,7 @@ class MultipleAccountPurchaseWindow(QWidget):
         depreciation_rate = None
         total_estimated_units = None
 
-        # Dynamic field validation and value retrieval (as before)
+        # Dynamic field validation and value retrieval
         if depreciation_method in ('Straight-Line', "Sum of the Years' Digit"):
             try:
                 useful_life_years = int(self.useful_life_input.text())
@@ -340,7 +339,7 @@ class MultipleAccountPurchaseWindow(QWidget):
                 if useful_life_years <= 0 or depreciation_rate <= 0 or depreciation_rate > 1:
                     raise ValueError
             except (ValueError, TypeError):
-                QMessageBox.warning(self, "Error", "Please enter valid values for Useful Life and Depreciation Rate")
+                QMessageBox.warning(self, "Error", "Please enter valid values for useful life and depreciation rate.")
                 return
 
         elif depreciation_method == 'Units of Production':
@@ -352,11 +351,13 @@ class MultipleAccountPurchaseWindow(QWidget):
                 QMessageBox.warning(self, "Error", "Please enter a valid integer value for Total Estimated Units.")
                 return
 
+
         # --- Total Amount Check ---
         total_payment = sum(account_data['amount'] for account_data in self.accounts_data)
         if total_payment != original_cost:
             QMessageBox.warning(self, "Error", "The sum of payment account amounts must equal the original cost.")
             return
+
 
         try:
             with self.db_manager as db:
@@ -368,13 +369,13 @@ class MultipleAccountPurchaseWindow(QWidget):
                     """,
                     (asset_code, asset_name, normalize_text(asset_name))
                 )
-                account_id = db.cursor.lastrowid  # Get the newly created account ID
+                account_id = db.cursor.lastrowid  # Get newly created account ID
 
-                # --- Check for Duplicate Account (after creating the account)---
+                # --- Check for Duplicate Account (after creation) ---
                 db.cursor.execute("SELECT asset_id FROM fixed_assets WHERE account_id = ?", (account_id,))
                 if db.cursor.fetchone():
-                    QMessageBox.critical(self, "Error", "This account has already been imported as a fixed asset.")
-                    db.conn.rollback()  # Rollback account creation
+                    QMessageBox.critical(self, "Error", "This account is already associated with a fixed asset.")
+                    db.conn.rollback()  # Roll back account creation
                     return
 
                 # --- Insert into fixed_assets ---
@@ -414,7 +415,6 @@ class MultipleAccountPurchaseWindow(QWidget):
                 db.commit()
                 QMessageBox.information(self, "Success", "Fixed asset purchased and registered successfully!")
                 self.close()
-
         except sqlite3.IntegrityError as e:
             db.conn.rollback()
             if "UNIQUE constraint failed: accounts.code" in str(e):

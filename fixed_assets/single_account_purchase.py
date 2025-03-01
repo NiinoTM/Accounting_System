@@ -87,7 +87,7 @@ class SingleAccountPurchaseWindow(QWidget):
         # --- Dynamic Fields (Useful Life, Depreciation Rate, Units) ---
         self.dynamic_fields_layout = QVBoxLayout()
         layout.addLayout(self.dynamic_fields_layout)
-        self.update_depreciation_fields() # set up on load
+        self.update_depreciation_fields()  # Set up initially
 
         # Payment Account Selection
         payment_account_layout = QHBoxLayout()
@@ -119,7 +119,7 @@ class SingleAccountPurchaseWindow(QWidget):
             parent=self,
             db_path=self.db_manager.db_path,
             table_name='accounts',
-            additional_filter="type_id IN (1, 2)"  # Current and Fixed Assets
+            additional_filter="type_id IN (1, 2, 3, 4)"  # Include Liabilities
         )
         if search_dialog.exec() == QDialog.Accepted:
             selected = search_dialog.get_selected_item()
@@ -130,6 +130,7 @@ class SingleAccountPurchaseWindow(QWidget):
     def update_depreciation_fields(self):
         method = self.method_combo.currentText()
 
+        # Clear existing dynamic fields (same as in import_fixed_asset.py)
         for i in reversed(range(self.dynamic_fields_layout.count())):
             widget = self.dynamic_fields_layout.itemAt(i).widget()
             if widget is not None:
@@ -166,30 +167,33 @@ class SingleAccountPurchaseWindow(QWidget):
             self.dynamic_fields_layout.addWidget(self.total_units_label)
             self.dynamic_fields_layout.addWidget(self.total_units_input)
 
-    def import_asset(self):
-        if not self.selected_account or not self.date_input.text() or not self.cost_input.text() or not self.salvage_input.text():
-            QMessageBox.warning(self, "Error", "Please fill in all required fields.")
+    def register_purchase(self):
+        # Input Validation
+        if (not self.date_input.text() or not self.cost_input.text()
+                or not self.salvage_input.text() or not self.name_input.text()
+                or not self.code_input.text() or not self.selected_payment_account):
+            QMessageBox.warning(self, "Error", "Please fill in all required fields and select a payment account.")
             return
+
         try:
             original_cost = float(self.cost_input.text())
             salvage_value = float(self.salvage_input.text())
             if original_cost <= 0 or salvage_value < 0 or salvage_value >= original_cost:
                 raise ValueError("Cost must be positive, and salvage value cannot be negative or greater/equal to cost.")
         except ValueError as e:
-            QMessageBox.warning(self, "Error", str(e))  # Show specific error
+            QMessageBox.warning(self, "Error", str(e))
             return
 
-        asset_name = self.selected_account['name']
-        account_id = self.selected_account['id']
+        asset_name = self.name_input.text().strip()
+        asset_code = self.code_input.text().strip()
         purchase_date = self.date_input.text()
         depreciation_method = self.method_combo.currentText()
 
         useful_life_years = None
         depreciation_rate = None
-        units_produced_period = None  # Not needed at *import* time
         total_estimated_units = None
 
-        # Dynamic field validation and value retrieval (as before)
+        # Dynamic field validation and value retrieval
         if depreciation_method in ('Straight-Line', "Sum of the Years' Digit"):
             try:
                 useful_life_years = int(self.useful_life_input.text())
@@ -203,8 +207,8 @@ class SingleAccountPurchaseWindow(QWidget):
             try:
                 useful_life_years = int(self.useful_life_input.text())
                 depreciation_rate = float(self.depreciation_rate_input.text())
-                if useful_life_years <= 0 or depreciation_rate <= 0 or depreciation_rate > 1 :
-                    raise ValueError("Useful life must be positive, and depreciation rate must be between 0 and 1.")
+                if useful_life_years <= 0 or depreciation_rate <= 0 or depreciation_rate > 1:
+                    raise ValueError
             except (ValueError, TypeError):
                 QMessageBox.warning(self, "Error", "Please enter valid values for useful life and depreciation rate.")
                 return
@@ -220,104 +224,23 @@ class SingleAccountPurchaseWindow(QWidget):
 
         try:
             with self.db_manager as db:
-                # --- Check for Duplicate Account ---
-                db.cursor.execute("SELECT asset_id FROM fixed_assets WHERE account_id = ?", (account_id,))
-                if db.cursor.fetchone():
-                    QMessageBox.critical(self, "Error", "This account has already been imported as a fixed asset.")
-                    return
-                # Insert into fixed_assets (without current_value or units_produced_period)
-                db.cursor.execute(
-                    """
-                    INSERT INTO fixed_assets (
-                        asset_name, account_id, purchase_date, original_cost,
-                        salvage_value, depreciation_method, useful_life_years,
-                        depreciation_rate, total_estimated_units
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (asset_name, account_id, purchase_date, original_cost,
-                     salvage_value, depreciation_method, useful_life_years,
-                     depreciation_rate, total_estimated_units)
-                )
-                db.commit()
-                QMessageBox.information(self, "Success", "Fixed asset imported successfully!")
-                self.close()
-
-        except sqlite3.Error as e:
-            db.conn.rollback()
-            QMessageBox.critical(self, "Database Error", str(e))
-
-    def register_purchase(self):
-      if (not self.date_input.text() or not self.cost_input.text()
-              or not self.salvage_input.text() or not self.name_input.text()
-              or not self.code_input.text() or not self.selected_payment_account):
-          QMessageBox.warning(self, "Error", "Please fill in all required fields.")
-          return
-
-      try:
-          original_cost = float(self.cost_input.text())
-          salvage_value = float(self.salvage_input.text())
-          if original_cost <= 0 or salvage_value < 0 or salvage_value >= original_cost:
-              raise ValueError
-      except ValueError:
-          QMessageBox.warning(self, "Error", "Invalid numeric values for cost or salvage value.")
-          return
-
-      asset_name = self.name_input.text().strip()
-      asset_code = self.code_input.text().strip()
-      purchase_date = self.date_input.text()
-      depreciation_method = self.method_combo.currentText()
-
-      useful_life_years = None
-      depreciation_rate = None
-      total_estimated_units = None
-
-      if depreciation_method in ('Straight-Line', "Sum of the Years' Digit"):
-          try:
-              useful_life_years = int(self.useful_life_input.text())
-              if useful_life_years <= 0:
-                  raise ValueError("Useful life must be positive.")
-          except (ValueError, TypeError):
-              QMessageBox.warning(self, "Error", "Please enter a valid integer for useful life.")
-              return
-
-      elif depreciation_method in ('Declining Balance', 'Double-Declining Balance'):
-          try:
-              useful_life_years = int(self.useful_life_input.text())
-              depreciation_rate = float(self.depreciation_rate_input.text())
-              if useful_life_years <= 0 or depreciation_rate <= 0 or depreciation_rate > 1:
-                  raise ValueError("Useful life must be positive, and depreciation rate must be between 0 and 1.")
-          except (ValueError, TypeError):
-              QMessageBox.warning(self, "Error", "Please enter valid values for useful life and depreciation rate.")
-              return
-
-      elif depreciation_method == 'Units of Production':
-          try:
-              total_estimated_units = int(self.total_units_input.text())
-              if total_estimated_units <= 0:
-                  raise ValueError
-          except (ValueError, TypeError):
-              QMessageBox.warning(self, "Error", "Please enter a valid integer value for Total Estimated Units.")
-              return
-
-      try:
-          with self.db_manager as db:
                 # --- Create the Account ---
                 db.cursor.execute(
-                  """
-                  INSERT INTO accounts (code, name, normalized_name, type_id, is_active)
-                  VALUES (?, ?, ?, 2, 1)
-                  """,
-                  (asset_code, asset_name, normalize_text(asset_name))
+                    """
+                    INSERT INTO accounts (code, name, normalized_name, type_id, is_active)
+                    VALUES (?, ?, ?, 2, 1)
+                    """,
+                    (asset_code, asset_name, normalize_text(asset_name))
                 )
-                account_id = db.cursor.lastrowid
+                account_id = db.cursor.lastrowid  # Get the newly created account ID
 
-                # --- Check for Duplicate Account (after creating the account)---
+                # --- Check for Duplicate Account (after creating) ---
                 db.cursor.execute("SELECT asset_id FROM fixed_assets WHERE account_id = ?", (account_id,))
                 if db.cursor.fetchone():
-                    QMessageBox.critical(self, "Error", "This account has already been imported as a fixed asset.")
-                    db.conn.rollback()  # Rollback account creation
+                    QMessageBox.critical(self, "Error", "This account has already been used for a fixed asset.")
+                    db.conn.rollback()
                     return
+
                 # --- Insert into fixed_assets ---
                 db.cursor.execute(
                     """
@@ -335,15 +258,14 @@ class SingleAccountPurchaseWindow(QWidget):
                 asset_id = db.cursor.lastrowid
 
                 # --- Create Purchase Transaction ---
+                description = f"{asset_name} - Purchase"
                 db.cursor.execute(
                     """
                     INSERT INTO transactions (date, description, debited, credited, amount)
                     VALUES (?, ?, ?, ?, ?)
                     """,
-                    (purchase_date, f"{asset_name} - Purchase", account_id, self.selected_payment_account['id'], original_cost)
+                    (purchase_date, description, account_id, self.selected_payment_account['id'], original_cost)
                 )
-                transaction_id = db.cursor.lastrowid
-
 
                 # --- Update Account Balances ---
                 db.cursor.execute("UPDATE accounts SET balance = balance + ? WHERE id = ?", (original_cost, account_id))
@@ -353,17 +275,17 @@ class SingleAccountPurchaseWindow(QWidget):
                 QMessageBox.information(self, "Success", "Fixed asset purchased and registered successfully!")
                 self.close()
 
-      except sqlite3.IntegrityError as e:
+        except sqlite3.IntegrityError as e:
             db.conn.rollback()
             if "UNIQUE constraint failed: accounts.code" in str(e):
                 QMessageBox.critical(self, "Database Error", "An account with this code already exists.")
             elif "UNIQUE constraint failed: accounts.name" in str(e):
                 QMessageBox.critical(self, "Database Error", "An account with this name already exists.")
             elif "UNIQUE constraint failed: accounts.normalized_name" in str(e):
-                 QMessageBox.critical(self, "Database Error", "An account with this name already exists.")
+                QMessageBox.critical(self, "Database Error", "An account with this name already exists.")
             else:
                 QMessageBox.critical(self, "Database Error", str(e))
 
-      except (sqlite3.Error, Exception) as e:
-          db.conn.rollback()
-          QMessageBox.critical(self, "Error", str(e))
+        except (sqlite3.Error, Exception) as e:
+            db.conn.rollback()
+            QMessageBox.critical(self, "Error", str(e))
