@@ -14,6 +14,9 @@ from ar_ap.record_asset_recovery import RecordAssetRecoveryWindow
 from ar_ap.adjust_receivable import AdjustReceivableWindow
 from ar_ap.write_off_receivable import WriteOffReceivableWindow
 
+from ar_ap.register_asset_transfer_inflow import RegisterAssetTransferInflowWindow
+from ar_ap.record_liability_settlement import RecordLiabilitySettlementWindow
+
 class ARPActions:  # Renamed for clarity, as it handles both AR and AP
     def __init__(self, main_window):
         self.main_window = main_window
@@ -73,8 +76,13 @@ class ARPActions:  # Renamed for clarity, as it handles both AR and AP
 
         # --- Creditor Transactions Submenu ---
         creditor_transactions_menu = QMenu("Creditor Transactions", ar_ap_menu)
+
         register_asset_transfer_in_action = QAction("Register Asset Transfer (Inflow)", self.main_window)
+        register_asset_transfer_in_action.triggered.connect(self.open_register_asset_transfer_inflow)
+
         record_liability_settlement_action = QAction("Record Liability Settlement (Outflow)", self.main_window)
+        record_liability_settlement_action.triggered.connect(self.open_record_liability_settlement)
+
         adjust_payable_action = QAction("Adjust Payable", self.main_window)
         cancel_payable_action = QAction("Cancel Payable", self.main_window)
 
@@ -122,7 +130,17 @@ class ARPActions:  # Renamed for clarity, as it handles both AR and AP
         self.adjust_receivable_window = AdjustReceivableWindow(self.main_window)
         self.adjust_receivable_window.show()
 
-    def open_write_off_receivable(self): # New method
+    def open_write_off_receivable(self):
         """Opens the write-off receivable window."""
         self.write_off_receivable_window = WriteOffReceivableWindow(self.main_window)
         self.write_off_receivable_window.show()
+
+    def open_register_asset_transfer_inflow(self):
+        """Opens the register asset transfer inflow window."""
+        self.register_inflow_window = RegisterAssetTransferInflowWindow(self.main_window)
+        self.register_inflow_window.show()
+
+    def open_record_liability_settlement(self):  # New method
+        """Opens the record liability settlement window."""
+        self.record_settlement_window = RecordLiabilitySettlementWindow(self.main_window)
+        self.record_settlement_window.show()
