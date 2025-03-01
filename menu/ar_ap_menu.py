@@ -12,6 +12,7 @@ from ar_ap.delete_ar_ap import DeleteDebtorCreditorWindow
 from ar_ap.register_asset_transfer_outflow import RegisterAssetTransferOutflowWindow
 from ar_ap.record_asset_recovery import RecordAssetRecoveryWindow
 from ar_ap.adjust_receivable import AdjustReceivableWindow
+from ar_ap.write_off_receivable import WriteOffReceivableWindow
 
 class ARPActions:  # Renamed for clarity, as it handles both AR and AP
     def __init__(self, main_window):
@@ -60,8 +61,9 @@ class ARPActions:  # Renamed for clarity, as it handles both AR and AP
 
         adjust_receivable_action = QAction("Adjust Receivable", self.main_window)
         adjust_receivable_action.triggered.connect(self.open_adjust_receivable)
-        
+
         write_off_receivable_action = QAction("Write-Off Receivable", self.main_window)
+        write_off_receivable_action.triggered.connect(self.open_write_off_receivable)
 
         debtor_transactions_menu.addAction(register_asset_transfer_out_action)
         debtor_transactions_menu.addAction(record_asset_recovery_action)
@@ -119,3 +121,8 @@ class ARPActions:  # Renamed for clarity, as it handles both AR and AP
         """Opens the adjust receivable window"""
         self.adjust_receivable_window = AdjustReceivableWindow(self.main_window)
         self.adjust_receivable_window.show()
+
+    def open_write_off_receivable(self): # New method
+        """Opens the write-off receivable window."""
+        self.write_off_receivable_window = WriteOffReceivableWindow(self.main_window)
+        self.write_off_receivable_window.show()
