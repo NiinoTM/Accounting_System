@@ -16,6 +16,8 @@ from ar_ap.write_off_receivable import WriteOffReceivableWindow
 
 from ar_ap.register_asset_transfer_inflow import RegisterAssetTransferInflowWindow
 from ar_ap.record_liability_settlement import RecordLiabilitySettlementWindow
+from ar_ap.adjust_payable import AdjustPayableWindow
+from ar_ap.cancel_payable import CancelPayableWindow
 
 class ARPActions:  # Renamed for clarity, as it handles both AR and AP
     def __init__(self, main_window):
@@ -84,7 +86,10 @@ class ARPActions:  # Renamed for clarity, as it handles both AR and AP
         record_liability_settlement_action.triggered.connect(self.open_record_liability_settlement)
 
         adjust_payable_action = QAction("Adjust Payable", self.main_window)
+        adjust_payable_action.triggered.connect(self.open_adjust_payable)
+
         cancel_payable_action = QAction("Cancel Payable", self.main_window)
+        cancel_payable_action.triggered.connect(self.open_cancel_payable)
 
         creditor_transactions_menu.addAction(register_asset_transfer_in_action)
         creditor_transactions_menu.addAction(record_liability_settlement_action)
@@ -144,3 +149,13 @@ class ARPActions:  # Renamed for clarity, as it handles both AR and AP
         """Opens the record liability settlement window."""
         self.record_settlement_window = RecordLiabilitySettlementWindow(self.main_window)
         self.record_settlement_window.show()
+
+    def open_adjust_payable(self):  # New method
+        """Opens the adjust payable window."""
+        self.adjust_payable_window = AdjustPayableWindow(self.main_window)
+        self.adjust_payable_window.show()
+
+    def open_cancel_payable(self):  # New method
+        """Opens the cancel payable window."""
+        self.cancel_payable_window = CancelPayableWindow(self.main_window)
+        self.cancel_payable_window.show()
