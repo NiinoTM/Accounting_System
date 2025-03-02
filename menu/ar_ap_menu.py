@@ -35,11 +35,6 @@ class ARPActions:  # Renamed for clarity, as it handles both AR and AP
         view_outstanding_balances_action.triggered.connect(self.view_outstanding_balance)
         ar_ap_menu.addAction(view_outstanding_balances_action)
 
-        # --- Settings Submenu ---
-        settings_action = QAction("Settings", ar_ap_menu)
-        settings_action.triggered.connect(self.open_settings)
-        ar_ap_menu.addAction(settings_action)
-
         # --- Debtor Creditor Management Submenu ---
         debtor_creditor_management_menu = QMenu("Debtor/Creditor Management", ar_ap_menu)
 
@@ -100,6 +95,11 @@ class ARPActions:  # Renamed for clarity, as it handles both AR and AP
         creditor_transactions_menu.addAction(cancel_payable_action)
 
         ar_ap_menu.addMenu(creditor_transactions_menu)
+
+        # --- Settings Submenu ---
+        settings_action = QAction("Settings", ar_ap_menu)
+        settings_action.triggered.connect(self.open_settings)
+        ar_ap_menu.addAction(settings_action)
 
         return ar_ap_menu
     
