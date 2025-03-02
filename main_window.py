@@ -9,6 +9,7 @@ from menu.templates_actions import TemplatesActions
 from menu.reports_actions import ReportsActions
 from menu.ar_ap_menu import ARPActions
 from menu.fixed_asset_menu import FixedAssetActions
+from menu.recurring_transactions_actions import RecurringTransactionsActions
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -19,6 +20,7 @@ class MainWindow(QMainWindow):
         self.ar_ap_actions = ARPActions(self)
         self.reports_actions = ReportsActions(self)
         self.fixed_assets_actions = FixedAssetActions(self)
+        self.recurring_transactions = RecurringTransactionsActions(self)
 
         self.init_ui()
         self.create_menu()
@@ -40,6 +42,11 @@ class MainWindow(QMainWindow):
             #TRANSACTIONS
         transactions_menu = self.transactions_actions.transactions_menu
         menubar.addMenu(transactions_menu)
+
+        # --- Recurring Transactions Menu ---
+        recurring_menu = self.recurring_transactions.recurring_transactions_menu
+        menubar.addMenu(recurring_menu) 
+
 
             #TEMPLATES
         templates_menu = self.templates_actions.templates_menu

@@ -2,7 +2,8 @@
 
 from PySide6.QtWidgets import QMenu
 from PySide6.QtGui import QAction
-from cashflow.settings import CashflowSettingsWindow  # Import the settings window
+from cashflow.settings import CashflowSettingsWindow
+from cashflow.actual_cashflow import ActualCashflowWindow
 
 class CashflowActions:
     def __init__(self, main_window):
@@ -13,7 +14,7 @@ class CashflowActions:
         cashflow_menu = QMenu("Cash Flow", self.main_window)
 
         actual_cashflow_action = QAction("Actual Cash Flow", self.main_window)
-        # actual_cashflow_action.triggered.connect(self.show_actual_cashflow) # Connect later
+        actual_cashflow_action.triggered.connect(self.show_actual_cashflow) # Connect later
 
         forecast_action = QAction("Cash Flow Forecast", self.main_window)
         # forecast_action.triggered.connect(self.show_forecast) # Connect later
@@ -28,8 +29,9 @@ class CashflowActions:
         return cashflow_menu
 
     # Placeholder methods (to be implemented later)
-    # def show_actual_cashflow(self):
-    #     pass
+    def show_actual_cashflow(self):
+        self.actual_cashflow = ActualCashflowWindow(self.main_window)
+        self.actual_cashflow.show()
 
     # def show_forecast(self):
     #     pass

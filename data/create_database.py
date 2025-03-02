@@ -193,6 +193,23 @@ class DatabaseManager:
             FOREIGN KEY (debited) REFERENCES accounts(id),
             FOREIGN KEY (credited) REFERENCES accounts(id)
         );
+
+        -- NEW TABLE: Recurring Transactions
+        CREATE TABLE IF NOT EXISTS recurring_transactions (
+            id INTEGER PRIMARY KEY,
+            description TEXT,
+            debited INTEGER NOT NULL,
+            credited INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            frequency TEXT NOT NULL,  -- 'weekly', 'monthly', 'yearly', or 'days'
+            interval INTEGER,          -- Number of days, if frequency is 'days'
+            start_date DATE NOT NULL,
+            end_date DATE,            -- NULL for no end date
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (debited) REFERENCES accounts(id),
+            FOREIGN KEY (credited) REFERENCES accounts(id)
+            );
         """
 
     @property
