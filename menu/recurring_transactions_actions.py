@@ -2,6 +2,7 @@
 
 from PySide6.QtWidgets import QMenu
 from PySide6.QtGui import QAction
+from recurring_transactions.create_recurring_transaction import CreateRecurringTransactionWindow
 
 class RecurringTransactionsActions:
     def __init__(self, main_window):
@@ -12,7 +13,7 @@ class RecurringTransactionsActions:
         recurring_menu = QMenu("Recurring Transactions", self.main_window)
 
         create_action = QAction("Create Recurring Transaction", self.main_window)
-        # create_action.triggered.connect(self.create_recurring_transaction)
+        create_action.triggered.connect(self.create_recurring_transaction)
 
         create_from_template_action = QAction("New Recurring Transaction from Template", self.main_window) # new
         # create_from_template_action.triggered.connect(self.create_from_template) # Connect later
@@ -35,8 +36,10 @@ class RecurringTransactionsActions:
         return recurring_menu
 
     # Placeholder methods
-    # def create_recurring_transaction(self):
-    #     pass
+    def create_recurring_transaction(self):
+        create_recurring_transaction_window = CreateRecurringTransactionWindow(self.main_window)
+        create_recurring_transaction_window.show()
+        
 
     # def create_from_template(self):  # NEW placeholder method
     #     pass
