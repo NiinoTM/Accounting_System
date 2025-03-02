@@ -30,7 +30,7 @@ class PurgeAssetRecordsWindow(QWidget):
         # Delete Button (Initially disabled)
         self.delete_button = QPushButton("Delete All Data")
         self.delete_button.clicked.connect(self.purge_asset)
-        self.delete_button.setEnabled(False)  # Disabled until an asset is selected
+        self.delete_button.setEnabled(False)
         layout.addWidget(self.delete_button)
 
         self.setLayout(layout)
@@ -40,7 +40,7 @@ class PurgeAssetRecordsWindow(QWidget):
             field_type='generic',
             parent=self,
             db_path=self.db_manager.db_path,
-            table_name='fixed_assets'  # Search in fixed_assets
+            table_name='fixed_assets'
         )
         if search_dialog.exec() == QDialog.Accepted:
             selected = search_dialog.get_selected_item()
@@ -55,7 +55,7 @@ class PurgeAssetRecordsWindow(QWidget):
 
         confirm = QMessageBox.question(
             self, "Confirm Purge",
-            "Are you sure you want to PERMANENTLY DELETE ALL data related to this asset?  This action CANNOT be undone.",
+            "Are you sure you want to PERMANENTLY DELETE ALL data related to this asset? This action CANNOT be undone.",
             QMessageBox.Yes | QMessageBox.No
         )
         if confirm != QMessageBox.Yes:
@@ -66,8 +66,9 @@ class PurgeAssetRecordsWindow(QWidget):
 
         try:
             with self.db_manager as db:
-                # --- 1. Find and Reverse Transactions ---
-                db.cursor.execute("SELECT id, debited, credited, amount FROM transactions WHERE description LIKE ?",(f"%{self.selected_asset['asset_name']}%",)) # LIKE query
+                # --- 1. Find and Reverse Transactions in 'transactions' table---
+                db.cursor.execute("SELECT id, debited, credited, amount FROM transactions WHERE description LIKE ?",
+                                   (f"%{self.selected_asset['asset_name']}%",))
                 transactions = db.cursor.fetchall()
                 for trans in transactions:
                     # Reverse the transaction's effect on account balances
@@ -79,25 +80,36 @@ class PurgeAssetRecordsWindow(QWidget):
                         "UPDATE accounts SET balance = balance + ? WHERE id = ?",
                         (trans['amount'], trans['credited'])
                     )
-
                     # Delete the transaction
                     db.cursor.execute("DELETE FROM transactions WHERE id = ?", (trans['id'],))
 
-                # --- 2. Delete from depreciation_schedule ---
+                # --- 2. Find and Delete Future Transactions ---
+                db.cursor.execute("SELECT id, debited, credited, amount FROM future_transactions WHERE description LIKE ?",
+                                   (f"%{self.selected_asset['asset_name']}%",))
+                future_transactions = db.cursor.fetchall()
+
+                for trans in future_transactions:
+
+                    # Delete from 'future_transactions'
+                    db.cursor.execute("DELETE FROM future_transactions WHERE id = ?", (trans['id'],))
+
+                # --- 3. Delete from depreciation_schedule ---
                 db.cursor.execute("DELETE FROM depreciation_schedule WHERE asset_id = ?", (asset_id,))
 
-                # --- 3. Delete from fixed_assets ---
+                # --- 4. Delete from fixed_assets ---
                 db.cursor.execute("DELETE FROM fixed_assets WHERE asset_id = ?", (asset_id,))
 
-                 # --- 4. Check Account Balance and Delete (if zero) ---
+                # --- 5. Check Account Balance and Delete (if zero) ---
                 db.cursor.execute("SELECT balance FROM accounts WHERE id = ?", (account_id,))
                 account_balance = db.cursor.fetchone()['balance']
 
-                if float(account_balance) == 0.0:
+                # Use a tolerance for floating-point comparison
+                tolerance = 1e-9  # A small tolerance value
+                if abs(float(account_balance)) < tolerance:  # Check if *close* to zero
                     db.cursor.execute("DELETE FROM accounts WHERE id = ?", (account_id,))
                 else:
                     QMessageBox.critical(self, "Error", f"Account balance is not zero ({account_balance}). Cannot delete account.")
-                    db.conn.rollback()  # Rollback changes!
+                    db.conn.rollback()
                     return
 
                 db.commit()

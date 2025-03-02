@@ -1,6 +1,8 @@
 # fixed_assets/single_account_purchase.py
 
 import sqlite3
+import json
+import os
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton,
                                QMessageBox, QHBoxLayout, QDialog, QComboBox)
 from PySide6.QtCore import QDate
@@ -9,7 +11,7 @@ from utils.crud.date_select import DateSelectWindow
 from utils.crud.search_dialog import AdvancedSearchDialog
 from utils.formatters import format_table_name, normalize_text
 from utils.depreciation_methods import calculate_depreciation
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 class SingleAccountPurchaseWindow(QWidget):
     def __init__(self, main_window):
@@ -24,6 +26,9 @@ class SingleAccountPurchaseWindow(QWidget):
     def init_ui(self):
         layout = QVBoxLayout(self)
 
+        # Asset Name, Code, Purchase Date, Original Cost, Salvage Value,
+        # Depreciation Method, Dynamic Fields - These all remain the same.
+        # ... (All the UI setup code from before is unchanged) ...
         # Asset Name
         name_layout = QHBoxLayout()
         self.name_label = QLabel("Asset Name:")
@@ -135,7 +140,6 @@ class SingleAccountPurchaseWindow(QWidget):
             widget = self.dynamic_fields_layout.itemAt(i).widget()
             if widget is not None:
                 widget.deleteLater()
-
         self.useful_life_label = None
         self.useful_life_input = None
         self.depreciation_rate_label = None
@@ -166,15 +170,13 @@ class SingleAccountPurchaseWindow(QWidget):
             self.total_units_input = QLineEdit()
             self.dynamic_fields_layout.addWidget(self.total_units_label)
             self.dynamic_fields_layout.addWidget(self.total_units_input)
-
     def register_purchase(self):
-        # Input Validation
+        # Input Validation (same as before)
         if (not self.date_input.text() or not self.cost_input.text()
                 or not self.salvage_input.text() or not self.name_input.text()
                 or not self.code_input.text() or not self.selected_payment_account):
             QMessageBox.warning(self, "Error", "Please fill in all required fields and select a payment account.")
             return
-
         try:
             original_cost = float(self.cost_input.text())
             salvage_value = float(self.salvage_input.text())
@@ -186,7 +188,8 @@ class SingleAccountPurchaseWindow(QWidget):
 
         asset_name = self.name_input.text().strip()
         asset_code = self.code_input.text().strip()
-        purchase_date = self.date_input.text()
+        purchase_date_str = self.date_input.text()
+        purchase_date = datetime.strptime(purchase_date_str, '%Y-%m-%d').date() # turns into date object
         depreciation_method = self.method_combo.currentText()
 
         useful_life_years = None
@@ -221,7 +224,6 @@ class SingleAccountPurchaseWindow(QWidget):
             except (ValueError, TypeError):
                 QMessageBox.warning(self, "Error", "Please enter a valid integer value for Total Estimated Units.")
                 return
-
         try:
             with self.db_manager as db:
                 # --- Create the Account ---
@@ -232,12 +234,12 @@ class SingleAccountPurchaseWindow(QWidget):
                     """,
                     (asset_code, asset_name, normalize_text(asset_name))
                 )
-                account_id = db.cursor.lastrowid  # Get the newly created account ID
+                account_id = db.cursor.lastrowid
 
                 # --- Check for Duplicate Account (after creating) ---
                 db.cursor.execute("SELECT asset_id FROM fixed_assets WHERE account_id = ?", (account_id,))
                 if db.cursor.fetchone():
-                    QMessageBox.critical(self, "Error", "This account has already been used for a fixed asset.")
+                    QMessageBox.critical(self, "Error", "This account is already associated with a fixed asset.")
                     db.conn.rollback()
                     return
 
@@ -251,7 +253,7 @@ class SingleAccountPurchaseWindow(QWidget):
                     )
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (asset_name, account_id, purchase_date, original_cost,
+                    (asset_name, account_id, purchase_date_str, original_cost,
                      salvage_value, depreciation_method, useful_life_years,
                      depreciation_rate, total_estimated_units)
                 )
@@ -264,12 +266,109 @@ class SingleAccountPurchaseWindow(QWidget):
                     INSERT INTO transactions (date, description, debited, credited, amount)
                     VALUES (?, ?, ?, ?, ?)
                     """,
-                    (purchase_date, description, account_id, self.selected_payment_account['id'], original_cost)
+                    (purchase_date_str, description, account_id, self.selected_payment_account['id'], original_cost)
                 )
 
                 # --- Update Account Balances ---
                 db.cursor.execute("UPDATE accounts SET balance = balance + ? WHERE id = ?", (original_cost, account_id))
                 db.cursor.execute("UPDATE accounts SET balance = balance - ? WHERE id = ?", (original_cost, self.selected_payment_account['id']))
+
+                # --- Schedule Future Depreciation ---
+                depreciation_settings_file = os.path.join("data", "depreciation_account.json")
+                if not os.path.exists(depreciation_settings_file):
+                    QMessageBox.critical(self, "Error", "Depreciation account not set. Please configure in settings")
+                    db.conn.rollback()
+                    return
+                with open(depreciation_settings_file, "r") as f:
+                    dep_settings = json.load(f)
+                depreciation_account_id = dep_settings.get("depreciation_account_id")
+                if not depreciation_account_id:
+                    QMessageBox.critical(self, "Error", "Depreciation account not set in settings.")
+                    db.conn.rollback()
+                    return
+
+                current_date = purchase_date  # Start from purchase date
+                current_book_value = original_cost
+                accumulated_depreciation = 0
+                period = 1
+
+                while True:  # Loop until break conditions are met
+                    # Calculate depreciation for the *current* month
+                    depreciation_amount, error = calculate_depreciation(
+                        method=depreciation_method,
+                        cost=original_cost,
+                        salvage_value=salvage_value,
+                        life=useful_life_years,
+                        rate=depreciation_rate,
+                        total_units=total_estimated_units,
+                        current_book_value = current_book_value,
+                        period = period #send the period to calculation
+                    )
+                    if error:
+                        QMessageBox.warning(self, "Depreciation Calculation Error", error)
+                        db.conn.rollback()
+                        return
+                    if depreciation_method != "Units of Production":
+                         depreciation_amount = depreciation_amount / 12
+
+                    current_book_value -= depreciation_amount
+                    current_book_value = max(current_book_value, salvage_value) # to avoid going less than salvage
+                    accumulated_depreciation += depreciation_amount
+                    # Get period end date (last day of the current month)
+                    if current_date.month == 12:
+                        period_end_date = date(current_date.year, 12, 31)
+                    else:
+                        period_end_date = date(current_date.year, current_date.month + 1, 1) - timedelta(days=1)
+
+
+                    # Insert into depreciation_schedule
+                    db.cursor.execute(
+                        """
+                        INSERT INTO depreciation_schedule (
+                            asset_id, period_start_date, period_end_date,
+                            depreciation_expense, accumulated_depreciation, book_value
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (asset_id, current_date.strftime('%Y-%m-%d'), period_end_date.strftime('%Y-%m-%d'),
+                         depreciation_amount, accumulated_depreciation, current_book_value)
+                    )
+                    schedule_id = db.cursor.lastrowid
+
+                    # Insert into future_transactions
+                    db.cursor.execute(
+                        """
+                        INSERT INTO future_transactions (date, description, debited, credited, amount)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (current_date.strftime('%Y-%m-%d'), f"Depreciation - {asset_name}",
+                         depreciation_account_id, account_id, depreciation_amount)
+                    )
+                    transaction_id = db.cursor.lastrowid
+
+                    # --- update transaction id ---
+                    db.cursor.execute(
+                    "UPDATE depreciation_schedule SET transaction_id = ? WHERE schedule_id = ?",
+                    (transaction_id, schedule_id)
+                    )
+
+
+                    # ---  Move to the *next* month ---  THIS IS THE KEY FIX
+                    if current_date.month == 12:
+                        next_month = 1
+                        next_year = current_date.year + 1
+                    else:
+                        next_month = current_date.month + 1
+                        next_year = current_date.year
+                    current_date = date(next_year, next_month, purchase_date.day) # using purchase date
+
+                    # --- Exit Conditions ---
+                    if current_book_value <= salvage_value:
+                         break  # Stop if book value reaches salvage value
+
+                    if useful_life_years is not None and period > useful_life_years * 12 :
+                        break  # Stop if useful life (in months) is exceeded
+                    period += 1
 
                 db.commit()
                 QMessageBox.information(self, "Success", "Fixed asset purchased and registered successfully!")
@@ -282,10 +381,9 @@ class SingleAccountPurchaseWindow(QWidget):
             elif "UNIQUE constraint failed: accounts.name" in str(e):
                 QMessageBox.critical(self, "Database Error", "An account with this name already exists.")
             elif "UNIQUE constraint failed: accounts.normalized_name" in str(e):
-                QMessageBox.critical(self, "Database Error", "An account with this name already exists.")
+                 QMessageBox.critical(self, "Database Error", "An account with this name already exists.")
             else:
                 QMessageBox.critical(self, "Database Error", str(e))
-
         except (sqlite3.Error, Exception) as e:
             db.conn.rollback()
             QMessageBox.critical(self, "Error", str(e))

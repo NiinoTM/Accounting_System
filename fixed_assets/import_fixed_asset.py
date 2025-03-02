@@ -1,4 +1,4 @@
-# fixed_asset/import_fixed_asset.py
+# fixed_assets/import_fixed_asset.py
 
 import sqlite3
 import json
@@ -11,7 +11,7 @@ from utils.crud.date_select import DateSelectWindow
 from utils.crud.search_dialog import AdvancedSearchDialog
 from utils.formatters import format_table_name, normalize_text
 from utils.depreciation_methods import calculate_depreciation
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 class ImportFixedAssetWindow(QWidget):
     def __init__(self, main_window):
@@ -112,6 +112,25 @@ class ImportFixedAssetWindow(QWidget):
         layout.addWidget(self.import_button)
         self.setLayout(layout)
 
+
+    def select_account(self):
+        search_dialog = AdvancedSearchDialog(
+            field_type='generic',
+            parent=self,
+            db_path=self.db_manager.db_path,
+            table_name='accounts',
+            additional_filter="type_id = 2"  # Filter for Fixed Asset accounts
+        )
+        if search_dialog.exec() == QDialog.Accepted:
+            selected = search_dialog.get_selected_item()
+            if selected:
+                # --- CRITICAL: Check Account Balance ---
+                if float(selected['balance']) != 0.0:
+                    QMessageBox.warning(self, "Error", "This account has a non-zero balance and cannot be imported as a fixed asset.")
+                    return
+
+                self.selected_account = selected  # Store the entire account record
+                self.account_input.setText(f"{selected['name']} ({selected['code']})")
 
     def select_date(self):
         date_dialog = DateSelectWindow()
@@ -246,7 +265,7 @@ class ImportFixedAssetWindow(QWidget):
                     """,
                     (asset_code, asset_name, normalize_text(asset_name))
                 )
-                account_id = db.cursor.lastrowid
+                account_id = db.cursor.lastrowid  # Get the newly created account ID
 
                 # --- Check for Duplicate Account (after creating the account)---
                 db.cursor.execute("SELECT asset_id FROM fixed_assets WHERE account_id = ?", (account_id,))
@@ -265,7 +284,7 @@ class ImportFixedAssetWindow(QWidget):
                     )
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (asset_name, account_id, purchase_date_str, original_cost,  # Use string format
+                    (asset_name, account_id, purchase_date_str, original_cost,
                      salvage_value, depreciation_method, useful_life_years,
                      depreciation_rate, total_estimated_units)
                 )
@@ -292,13 +311,13 @@ class ImportFixedAssetWindow(QWidget):
                         rate=depreciation_rate,
                         total_units=total_estimated_units,
                         current_book_value = current_book_value,
-                        period= month + 1
+                        period = month + 1
                     )
                     if error:
                         QMessageBox.critical(self, "Depreciation Calculation Error", error)
                         db.conn.rollback()
                         return
-                    if depreciation_method not in ["Units of Production"]:
+                    if depreciation_method != "Units of Production":
                          depreciation_for_month = depreciation_for_month / 12
                     #print(f"dep month {depreciation_for_month}") # For debugging
 
@@ -334,15 +353,14 @@ class ImportFixedAssetWindow(QWidget):
                 settings_file = os.path.join("data", "owner_equity_account.json")
                 if not os.path.exists(settings_file):
                     QMessageBox.critical(self, "Error", "Owner's Equity account not set.  Please configure it in Fixed Asset Settings.")
-                    db.conn.rollback()
+                    db.conn.rollback()  # Rollback changes!
                     return
-
                 with open(settings_file, "r") as f:
                     settings = json.load(f)
                 equity_account_id = settings.get("owner_equity_account_id")
                 if not equity_account_id:
                     QMessageBox.critical(self, "Error", "Owner's Equity account not set in Fixed Asset Settings.")
-                    db.conn.rollback()
+                    db.conn.rollback()  # Rollback changes!
                     return
 
 
@@ -352,8 +370,7 @@ class ImportFixedAssetWindow(QWidget):
                     VALUES (?, ?, ?, ?, ?)
                     """,
                     (period_start_date_str, f"{asset_name} - Imported", account_id, equity_account_id, current_book_value) # use current book
-                    )
-
+                )
                 transaction_id = db.cursor.lastrowid
 
                 # --- update transaction id ---
@@ -367,11 +384,111 @@ class ImportFixedAssetWindow(QWidget):
                 db.cursor.execute("UPDATE accounts SET balance = balance + ? WHERE id = ?", (current_book_value, account_id))
                 db.cursor.execute("UPDATE accounts SET balance = balance - ? WHERE id = ?", (current_book_value, equity_account_id))
 
+                # --- Schedule Future Depreciation ---
+                # Load depreciation expense account ID from settings
+                depreciation_settings_file = os.path.join("data", "depreciation_account.json")
+                if not os.path.exists(depreciation_settings_file):
+                    QMessageBox.critical(self, "Error", "Depreciation account not set. Please configure in settings")
+                    db.conn.rollback()
+                    return
+                with open(depreciation_settings_file, "r") as f:
+                    dep_settings = json.load(f)
+
+                depreciation_account_id = dep_settings.get("depreciation_account_id")
+
+                if not depreciation_account_id:
+                    QMessageBox.critical(self, "Error", "Depreciation account not set in settings.")
+                    db.conn.rollback()
+                    return
+                current_date = period_start_date
+                if current_date.month == 12: # adds one to period
+                    current_date = date(current_date.year + 1, 1, 1)
+                else:
+                    current_date = date(current_date.year, current_date.month + 1, 1)
+                period = months_to_depreciate + 1 # the months it has passed + the start of period
+
+                # --- MODIFIED LOOP ---
+                while True:  # Loop indefinitely, but with multiple exit conditions
+                    if useful_life_years is not None and period > useful_life_years * 12:
+                        break  # Stop if we've exceeded the useful life in months
+
+                    if current_book_value <= salvage_value:
+                        break # stops calculating if current value is less or equal to salvage
+
+                    # Calculate depreciation for the period
+                    depreciation_amount, error = calculate_depreciation(
+                        method=depreciation_method,
+                        cost=original_cost,
+                        salvage_value=salvage_value,
+                        life=useful_life_years,
+                        rate=depreciation_rate,
+                        total_units=total_estimated_units,
+                        current_book_value = current_book_value,
+                        period = period #send the period to calculation
+                    )
+                    if error:
+                      QMessageBox.warning(self,"Depreciation Calculation Error", error)
+                      db.conn.rollback()
+                      return
+                    if depreciation_method != "Units of Production":
+                         depreciation_amount = depreciation_amount / 12
+
+                    current_book_value -= depreciation_amount  # Update book value
+                    current_book_value = max(current_book_value, salvage_value) # to avoid going less than salvage
+
+                    accumulated_depreciation += depreciation_amount
+
+
+                    # Get period end date (last day of the current month)
+                    if current_date.month == 12:
+                        period_end_date = date(current_date.year, 12, 31)
+                    else:
+                        period_end_date = date(current_date.year, current_date.month + 1, 1) - timedelta(days=1)
+
+
+                    # Insert into depreciation_schedule
+                    db.cursor.execute(
+                        """
+                        INSERT INTO depreciation_schedule (
+                            asset_id, period_start_date, period_end_date,
+                            depreciation_expense, accumulated_depreciation, book_value
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (asset_id, current_date.strftime('%Y-%m-%d'), period_end_date.strftime('%Y-%m-%d'),
+                         depreciation_amount, accumulated_depreciation, current_book_value)
+                    )
+                    schedule_id = db.cursor.lastrowid
+
+                    # Insert into future_transactions
+                    db.cursor.execute(
+                        """
+                        INSERT INTO future_transactions (date, description, debited, credited, amount)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (current_date.strftime('%Y-%m-%d'), f"Depreciation - {asset_name}",
+                         depreciation_account_id, account_id, depreciation_amount)
+                    )
+                    transaction_id = db.cursor.lastrowid
+
+                    # --- update transaction id ---
+                    db.cursor.execute(
+                    "UPDATE depreciation_schedule SET transaction_id = ? WHERE schedule_id = ?",
+                    (transaction_id, schedule_id)
+                    )
+
+                    # Move to the next month
+                    if current_date.month == 12:
+                        current_date = date(current_date.year + 1, 1, 1)
+                    else:
+                        current_date = date(current_date.year, current_date.month + 1, 1)
+
+                    period += 1 # adds one to period.
+
+
                 db.commit()
-                QMessageBox.information(self, "Success", "Fixed asset imported successfully!")
+                QMessageBox.information(self, "Success", "Fixed asset imported and depreciation scheduled successfully!")
                 self.close()
-
-
 
         except sqlite3.IntegrityError as e:
             db.conn.rollback()
