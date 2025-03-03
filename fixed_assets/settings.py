@@ -4,7 +4,7 @@ import os
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton,
                                QMessageBox, QHBoxLayout, QLineEdit, QDialog)
 from utils.crud.search_dialog import AdvancedSearchDialog
-from data.create_database import DatabaseManager
+from create_database import DatabaseManager
 
 class FixedAssetSettingsWindow(QWidget):
     def __init__(self, main_window):

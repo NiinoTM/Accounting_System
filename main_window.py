@@ -10,6 +10,7 @@ from menu.reports_actions import ReportsActions
 from menu.ar_ap_menu import ARPActions
 from menu.fixed_asset_menu import FixedAssetActions
 from menu.recurring_transactions_actions import RecurringTransactionsActions
+from menu.sync_actions import SyncActions  # Import the new sync actions module
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -21,6 +22,7 @@ class MainWindow(QMainWindow):
         self.reports_actions = ReportsActions(self)
         self.fixed_assets_actions = FixedAssetActions(self)
         self.recurring_transactions = RecurringTransactionsActions(self)
+        self.sync_actions = SyncActions(self)  # Initialize the sync actions
 
         self.init_ui()
         self.create_menu()
@@ -63,8 +65,9 @@ class MainWindow(QMainWindow):
         fixed_asset_menu = self.fixed_assets_actions.fixed_asset_menu
         menubar.addMenu(fixed_asset_menu)
 
-
-        backup_menu = menubar.addMenu("Backups")
+        # SYNC - Use the sync menu from the sync_actions class
+        sync_menu = self.sync_actions.sync_menu
+        menubar.addMenu(sync_menu)
 
         help_menu = menubar.addMenu("Help")
 
@@ -79,6 +82,3 @@ class MainWindow(QMainWindow):
         self.dashboard = QLabel("Financial Dashboard")
         self.dashboard.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.dashboard)
- 
-    
-    

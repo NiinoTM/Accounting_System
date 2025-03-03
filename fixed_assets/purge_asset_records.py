@@ -3,7 +3,7 @@
 import sqlite3
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton,
                                QMessageBox, QDialog)
-from data.create_database import DatabaseManager
+from create_database import DatabaseManager
 from utils.crud.search_dialog import AdvancedSearchDialog
 
 class PurgeAssetRecordsWindow(QWidget):

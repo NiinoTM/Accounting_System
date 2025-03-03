@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton,
                                QMessageBox, QHBoxLayout, QScrollArea)
 from PySide6.QtCore import Qt
-from data.create_database import DatabaseManager
+from create_database import DatabaseManager
 from utils.crud.generic_crud import GenericCRUD
 from utils.formatters import format_table_name
 

@@ -6,7 +6,7 @@ import os
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton,
                                QMessageBox, QHBoxLayout, QDialog)
 from PySide6.QtCore import QDate
-from data.create_database import DatabaseManager
+from create_database import DatabaseManager
 from utils.crud.date_select import DateSelectWindow
 from utils.crud.search_dialog import AdvancedSearchDialog
 from utils.formatters import format_table_name
@@ -179,4 +179,4 @@ class RecordAssetRecoveryWindow(QWidget):
 
         except (sqlite3.Error, Exception) as e:
             db.conn.rollback()
-            QMessageBox.critical(self, "Error", str(e))
+            QMessageBox.critical(self, "Error", str(e)) 

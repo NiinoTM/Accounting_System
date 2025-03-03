@@ -6,13 +6,13 @@ import os
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton,
                                QMessageBox, QHBoxLayout, QDialog)
 from PySide6.QtCore import QDate
-from data.create_database import DatabaseManager
+from create_database import DatabaseManager
 from utils.crud.date_select import DateSelectWindow
 from utils.crud.search_dialog import AdvancedSearchDialog
 from utils.formatters import format_table_name
 
 class RegisterAssetTransferInflowWindow(QWidget):
-    def __init__(self, main_window):
+    def __init__(self, main_window): 
         super().__init__()
         self.main_window = main_window
         self.setWindowTitle("Register Asset Transfer (Inflow)")

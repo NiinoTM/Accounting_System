@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton,
                                QMessageBox, QHBoxLayout, QLineEdit, QDialog,
                                QTableWidget, QTableWidgetItem, QAbstractItemView, QDialogButtonBox)
 from PySide6.QtCore import Qt
-from data.create_database import DatabaseManager
+from create_database import DatabaseManager
 from utils.crud.search_dialog import AdvancedSearchDialog
 
 class CashflowSettingsWindow(QWidget):

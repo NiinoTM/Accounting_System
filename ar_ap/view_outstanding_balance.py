@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QTableWidget,
                                QTableWidgetItem, QMessageBox, QDialog,
                                QHBoxLayout)
 from PySide6.QtCore import Qt
-from data.create_database import DatabaseManager
+from create_database import DatabaseManager
 from utils.formatters import format_table_name
 
 class OutstandingBalanceWindow(QWidget):
@@ -119,7 +119,7 @@ class OutstandingBalanceWindow(QWidget):
                 transaction_table.setRowCount(len(transactions))
                 for row_num, trans in enumerate(transactions):
                     transaction_table.setItem(row_num, 0, QTableWidgetItem(str(trans['id'])))
-                    transaction_table.setItem(row_num, 1, QTableWidgetItem(trans['date']))
+                    transaction_table.setItem(row_num, 1, QTableWidgetItem(trans['date'])) 
                     transaction_table.setItem(row_num, 2, QTableWidgetItem(trans['details']))
                     transaction_table.setItem(row_num, 3, QTableWidgetItem(str(trans['amount'])))
 

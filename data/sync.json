@@ -1,0 +1,11 @@
+{
+    "server_url": "",
+    "username": "",
+    "api_key": "",
+    "auto_sync": true,
+    "sync_interval": "Daily",
+    "conflict_resolution": "Always ask",
+    "drive_folder_id": "1ZqSLWL7POqp0gufYuMxFdyHX0sjDKMtJ",
+    "local_dir": "data",
+    "credentials_file": "credentials\\credentials.json"
+}

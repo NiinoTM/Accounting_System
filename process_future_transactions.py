@@ -3,7 +3,7 @@
 import sqlite3
 from datetime import date
 from PySide6.QtWidgets import QMessageBox, QTableWidget, QTableWidgetItem, QDialog, QVBoxLayout
-from data.create_database import DatabaseManager
+from create_database import DatabaseManager
 
 
 def process_future_transactions(parent=None):

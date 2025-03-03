@@ -2,7 +2,7 @@
 import sqlite3
 from abc import ABC, abstractmethod
 from utils.formatters import format_table_name
-from data.create_database import DatabaseManager
+from create_database import DatabaseManager
 
 class BaseCRUD(ABC):
     """Abstract base class for CRUD operations."""

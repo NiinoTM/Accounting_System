@@ -4,7 +4,7 @@ import sqlite3
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton,
                                QMessageBox, QHBoxLayout, QDialog)
 from PySide6.QtCore import QDate
-from data.create_database import DatabaseManager
+from create_database import DatabaseManager
 from utils.crud.search_dialog import AdvancedSearchDialog
 from utils.formatters import format_table_name
 

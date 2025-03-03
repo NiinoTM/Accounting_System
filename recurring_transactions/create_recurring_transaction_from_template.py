@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushBut
                                QMessageBox, QHBoxLayout, QComboBox, QRadioButton, 
                                QButtonGroup, QTableWidget, QTableWidgetItem)
 from PySide6.QtCore import QDate
-from data.create_database import DatabaseManager
+from create_database import DatabaseManager
 from utils.crud.date_select import DateSelectWindow
 from utils.crud.search_dialog import AdvancedSearchDialog
 from datetime import datetime, date, timedelta

@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, QPushBut
                                QMessageBox, QHBoxLayout, QDialog, QComboBox,
                                QTableWidget, QTableWidgetItem, QAbstractItemView, QDialogButtonBox)
 from PySide6.QtCore import QDate, Qt
-from data.create_database import DatabaseManager
+from create_database import DatabaseManager
 from utils.crud.date_select import DateSelectWindow
 from utils.crud.search_dialog import AdvancedSearchDialog
 from utils.formatters import format_table_name, normalize_text

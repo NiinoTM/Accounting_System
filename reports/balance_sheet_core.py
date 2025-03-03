@@ -1,6 +1,6 @@
 # reports/balance_sheet_core.py
 import sqlite3
-from data.create_database import DatabaseManager  # Or your DB manager path
+from create_database import DatabaseManager  # Or your DB manager path
 
 class BalanceSheet:
     def __init__(self):

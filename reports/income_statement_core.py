@@ -1,5 +1,5 @@
 import sqlite3
-from data.create_database import DatabaseManager
+from create_database import DatabaseManager
 
 def generate_income_statement_data(start_date, end_date):
     """

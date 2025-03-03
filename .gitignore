@@ -4,3 +4,5 @@ __pycache__/
 
 # Windows Python extension modules
 *.pyd
+
+credentials.json

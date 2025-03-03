@@ -3,7 +3,7 @@ import sys
 from PySide6.QtWidgets import QApplication
 
 # modules
-from data.create_database import create_database
+from create_database import create_database
 from main_window import MainWindow
 from process_future_transactions import process_future_transactions # Import
 

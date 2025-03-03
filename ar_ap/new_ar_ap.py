@@ -3,7 +3,7 @@
 import sqlite3
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit,
                                QPushButton, QMessageBox, QRadioButton, QHBoxLayout)
-from data.create_database import DatabaseManager
+from create_database import DatabaseManager
 from utils.formatters import normalize_text
 
 class NewDebtorCreditorWindow(QWidget):
