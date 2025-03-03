@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    /* Previous styles remain the same until totals-row */
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 2rem;
+      background: #f5f5f5;
+    }
+    .balance-sheet {
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+      border-bottom: 3px solid #2c3e50;
+      padding-bottom: 1rem;
+    }
+    .header h1 {
+      color: #2c3e50;
+      margin: 0;
+      font-size: 2rem;
+    }
+    .header p {
+      color: #7f8c8d;
+      margin: 0.5rem 0 0;
+    }
+    .content {
+      display: flex;
+      gap: 2rem;
+    }
+    .column {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .section {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .section-title {
+      color: #2c3e50;
+      font-size: 1.5rem;
+      font-weight: bold;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #3498db;
+      margin-bottom: 1rem;
+    }
+    .subsection {
+      margin-bottom: 1.5rem;
+    }
+    .subsection-title {
+      color: #34495e;
+      font-weight: bold;
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+    }
+    .line-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.3rem 0;
+      color: #555;
+    }
+    .line-item span:first-child {
+      margin-right: 3rem;
+    }
+    .line-item:hover {
+      background: #f8f9fa;
+    }
+    .subtotal {
+      border-top: 1px solid #bdc3c7;
+      padding-top: 0.5rem;
+      margin-top: 0.5rem;
+      font-weight: bold;
+      color: #2c3e50;
+    }
+    .amount {
+      font-family: 'Consolas', monospace;
+      min-width: 100px;
+      text-align: right;
+    }
+    /* Updated totals-row styles */
+    .totals-row {
+      display: flex;
+      margin-top: 2rem;
+      border-top: 3px double #2c3e50;
+      padding-top: 1rem;
+      gap: 2rem; /* Add gap between the total sections */
+    }
+    .grand-total {
+      flex: 1;
+      font-weight: bold;
+      font-size: 1.1rem;
+      color: #2c3e50;
+      display: grid;
+      grid-template-columns: 1fr 150px; /* Fixed width for amount column */
+      gap: 2rem; /* Space between text and amount */
+    }
+    .grand-total .amount {
+      min-width: 150px;
+      text-align: right;
+    }
+    .grand-total span:first-child {
+      text-align: left;
+    }
+    /* Previous styles continue... */
+  </style>
+</head>
+<body>
+  <!-- Previous HTML remains the same until totals-row -->
+  <div class="balance-sheet">
+    <div class="header">
+      <h1>BALANCE SHEET</h1>
+      <p>As of December 31, 2023</p>
+    </div>
+    
+    <div class="content">
+      <!-- ASSETS COLUMN -->
+      <div class="column">
+        <div class="section">
+          <div class="section-title">ASSETS</div>
+          
+          <div class="subsection">
+            <div class="subsection-title">Current Assets</div>
+            <div class="line-item">
+              <span>Nubank</span>
+              <span class="amount">$ 387.14</span>
+            </div>
+            <div class="line-item">
+              <span>Itau</span>
+              <span class="amount">$ 449.31</span>
+            </div>
+            <div class="line-item">
+              <span>Caju</span>
+              <span class="amount">$ 9.33</span>
+            </div>
+            <div class="line-item">
+              <span>Inter</span>
+              <span class="amount">$ 69.27</span>
+            </div>
+            <div class="line-item">
+              <span>Cash on Hand</span>
+              <span class="amount">$ 102.00</span>
+            </div>
+            <div class="line-item">
+              <span>Accounts Receivable</span>
+              <span class="amount">$ 1,776.78</span>
+            </div>
+            <div class="line-item subtotal">
+              <span>Total Current Assets</span>
+              <span class="amount">$ 2,793.83</span>
+            </div>
+          </div>
+          
+          <div class="subsection">
+            <div class="subsection-title">Fixed Assets</div>
+            <div class="line-item">
+              <span>Services Receivable</span>
+              <span class="amount">$ 2,272.13</span>
+            </div>
+            <div class="line-item">
+              <span>Acer NitroV15 Notebook</span>
+              <span class="amount">$ 3,317.31</span>
+            </div>
+            <div class="line-item subtotal">
+              <span>Total Fixed Assets</span>
+              <span class="amount">$ 5,589.44</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- LIABILITIES AND EQUITY COLUMN -->
+      <div class="column">
+        <div class="section">
+          <div class="section-title">LIABILITIES & EQUITY</div>
+          
+          <div class="subsection">
+            <div class="subsection-title">Current Liabilities</div>
+            <div class="line-item">
+              <span>Credit Card - Nubank</span>
+              <span class="amount">$ 2,130.60</span>
+            </div>
+            <div class="line-item">
+              <span>Credit Card - Inter</span>
+              <span class="amount">$ 1,712.80</span>
+            </div>
+            <div class="line-item">
+              <span>Accounts Payable</span>
+              <span class="amount">$ 120.00</span>
+            </div>
+            <div class="line-item subtotal">
+              <span>Total Current Liabilities</span>
+              <span class="amount">$ 3,963.40</span>
+            </div>
+          </div>
+          
+          <div class="subsection">
+            <div class="subsection-title">Long-Term Liabilities</div>
+            <div class="line-item">
+              <span>Credit Card - MPagoFell</span>
+              <span class="amount">$ 4,002.66</span>
+            </div>
+            <div class="line-item subtotal">
+              <span>Total Non-Current Liabilities</span>
+              <span class="amount">$ 4,002.66</span>
+            </div>
+          </div>
+          
+          <div class="subsection">
+            <div class="subsection-title">Equity</div>
+            <div class="line-item">
+              <span>Owner's Equity</span>
+              <span class="amount">$ 961.98</span>
+            </div>
+            <div class="line-item">
+              <span>Period Earnings</span>
+              <span class="amount">$ -544.77</span>
+            </div>
+            <div class="line-item subtotal">
+              <span>Total Equity</span>
+              <span class="amount">$ 417.21</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Aligned Totals Row -->
+    <div class="totals-row">
+      <div class="grand-total">
+        <span>TOTAL ASSETS</span>
+        <span class="amount">$ 8,383.27</span>
+      </div>
+      <div class="grand-total">
+        <span>TOTAL LIABILITIES & EQUITY</span>
+        <span class="amount">$ 8,383.27</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

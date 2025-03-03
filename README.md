@@ -6,6 +6,8 @@ Welcome to FinTrack, a user-friendly, Python-based financial management applicat
 
 This README provides a comprehensive guide to understanding and using FinTrack, covering all its functionalities and features.
 
+## Installation Nuitka:
+python -m nuitka --onefile --windows-disable-console --windows-icon-from-ico="C:\Users\Niino\Desktop\Accounting_System\data\base.ico" --include-data-dir=data=data --follow-imports --enable-plugin=pyside6 main.py
 ## Table of Contents
 
 1.  [Features](#features)

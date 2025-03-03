@@ -6,3 +6,9 @@ __pycache__/
 *.pyd
 
 credentials.json
+
+main.build/
+
+main.onefile-build/
+
+main.build/
