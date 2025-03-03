@@ -1,8 +1,0 @@
-# Compiled Python bytecode
-__pycache__/
-*.pyc
-
-# Windows Python extension modules
-*.pyd
-
-credentials.json
