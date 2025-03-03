@@ -1,6 +1,8 @@
 #libraries
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QLabel
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
+import os, sys
 
 #modules
 from menu.setup_menu.setup_actions import SetupActions
@@ -12,9 +14,17 @@ from menu.fixed_asset_menu import FixedAssetActions
 from menu.recurring_transactions_actions import RecurringTransactionsActions
 from menu.sync_actions import SyncActions  # Import the new sync actions module
 
+if getattr(sys, 'frozen', False):
+    BASE_DIR = sys._MEIPASS
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+ICON_PATH = os.path.join(BASE_DIR, "data", "base.ico")
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.setWindowIcon(QIcon(ICON_PATH))
         self.setup_actions = SetupActions(self)
         self.transactions_actions = TransactionsActions(self)
         self.templates_actions = TemplatesActions(self)

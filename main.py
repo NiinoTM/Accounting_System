@@ -11,10 +11,12 @@ from process_future_transactions import process_future_transactions
 from backup_system import register_app_close_backup  # Import the backup system
 
 
-# Get the directory where main.py is located
-BASE_DIR = sys.path[0]
-ICON_PATH = os.path.join(BASE_DIR, "data/base.ico")  # Icon in the same folder as main.py
+if getattr(sys, 'frozen', False):
+    BASE_DIR = sys._MEIPASS
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+ICON_PATH = os.path.join(BASE_DIR, "data", "base.ico")
 
 if __name__ == "__main__":
     # Initialize database

@@ -34,7 +34,7 @@ def main():
     # --- Get the absolute path to the icon ---
     #  This is the most crucial fix!
     script_dir = os.path.dirname(os.path.abspath(__file__))  # Absolute path to *this* script
-    icon_path = os.path.join(script_dir, "data", "eggs.ico") # Absolute path to the icon
+    icon_path = os.path.join(script_dir, "data", "base.ico") # Absolute path to the icon
 
 
     # Construct the full PyInstaller command
@@ -42,7 +42,7 @@ def main():
         "pyinstaller",
         "--onedir",
         "--noconsole",
-        "--icon", icon_path  # Use the absolute path here!
+        "--icon", f"{icon_path}" 
     ] + exclude_args + add_data_args + ["main.py"]
 
     print("Running PyInstaller with the following command:")
