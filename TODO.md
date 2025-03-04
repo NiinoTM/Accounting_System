@@ -1,7 +1,6 @@
-. Edit the amount of the future transactions as their date = actual date
-. Change view transactions to show the account too
-. Create view transaction by account
-. Create view transaction by period
-. Create Index & Economic Rates
-. Order itens in BalanceSheet according to CODE
-. Create forecast for cashflow.
+~~1. Create Fixed Asset~~
+~~2. Create CashFlow Forecast~~
+3. Create Index & Economic Rates
+4. Create automatic transaction from a frequency
+5. Order itens in BalanceSheet according to CODE
+6. Create forecast for cashflow.
