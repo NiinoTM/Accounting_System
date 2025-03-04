@@ -6,65 +6,7 @@ from PySide6.QtCore import Qt
 from utils.crud.generic_crud import GenericCRUD
 from utils.formatters import format_table_name
 from PySide6.QtGui import QPalette, QColor
-
-
-def generate_income_statement_data(start_date, end_date):
-    """
-    Generates income statement data.
-    """
-    db_manager = DatabaseManager()
-    try:
-        with db_manager as db:
-            db.cursor.execute("""
-                SELECT
-                    a.name AS account_name,
-                    at.name AS account_type,
-                    SUM(CASE
-                        WHEN t.debited = a.id THEN t.amount
-                        WHEN t.credited = a.id THEN -t.amount
-                        ELSE 0
-                    END) AS balance
-                FROM transactions t
-                JOIN accounts a ON t.debited = a.id OR t.credited = a.id
-                JOIN account_types at ON a.type_id = at.id
-                WHERE t.date BETWEEN ? AND ?
-                  AND at.name IN ('Revenue', 'Expense')
-                GROUP BY a.name, at.name
-                ORDER BY at.name, a.name
-            """, (start_date, end_date))
-            transactions = db.cursor.fetchall()
-
-            revenues = []
-            expenses = []
-            total_revenue = 0
-            total_expenses = 0
-
-            for row in transactions:
-                account_name = row['account_name']
-                account_type = row['account_type']
-                balance = row['balance']
-
-                if account_type == 'Revenue':
-                    revenues.append((account_name, balance))
-                    total_revenue += balance
-                elif account_type == 'Expense':
-                    expenses.append((account_name, balance))
-                    total_expenses += balance
-
-            net_income = total_revenue - total_expenses
-
-            return {
-                'Revenues': revenues,
-                'Expenses': expenses,
-                'Net Income': net_income
-            }
-
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
-        return None
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return None
+from reports.income_statement_core import generate_income_statement_data
 
 class IncomeStatementWindow(QWidget):
     def __init__(self, main_window):
@@ -76,7 +18,6 @@ class IncomeStatementWindow(QWidget):
         self.end_date = None
         self.show_report_on_main_window()
         self.setup_dark_theme()
-
 
     def setup_dark_theme(self):
         """Sets up a dark theme for the UI."""
@@ -147,23 +88,12 @@ class IncomeStatementWindow(QWidget):
         self.content_layout.setSpacing(20)
 
         # Revenue Section
-        self.revenue_section = self.create_section("REVENUE")
+        self.revenue_section = self.create_section("REVENUE", text_color="#50C878")  # Green color for revenue
         self.content_layout.addWidget(self.revenue_section)
 
         # Expenses Section
-        self.expenses_section = self.create_section("EXPENSES")
+        self.expenses_section = self.create_section("EXPENSES", text_color="#FF6B6B")  # Red color for expenses
         self.content_layout.addWidget(self.expenses_section)
-
-        # Net Income/Loss
-        self.net_income_widget = QWidget()
-        net_income_layout = QHBoxLayout(self.net_income_widget)
-        self.net_income_label = QLabel("NET INCOME")
-        self.net_income_amount = QLabel("$ 0.00")
-        net_income_layout.addWidget(self.net_income_label)
-        net_income_layout.addStretch()
-        net_income_layout.addWidget(self.net_income_amount)
-        self.content_layout.addWidget(self.net_income_widget)
-
 
         # Wrap content in scroll area
         scroll = QScrollArea()
@@ -173,26 +103,32 @@ class IncomeStatementWindow(QWidget):
         self.layout.addWidget(scroll)
         self.apply_styles()
 
-
-
-    def create_section(self, title):
-        """Create a section widget with title"""
+    def create_section(self, title, text_color="#FFFFFF"):
+        """Create a section widget with title and specified color"""
         section = QWidget()
         layout = QVBoxLayout(section)
         layout.setSpacing(15)
         
         title_label = QLabel(title)
-        title_label.setStyleSheet("""
+        title_label.setStyleSheet(f"""
             font-size: 18px;
             font-weight: bold;
             padding-bottom: 5px;
-            border-bottom: 2px solid #3498db;
+            border-bottom: 2px solid {text_color};
+            color: {text_color};
         """)
         layout.addWidget(title_label)
         return section
 
-    def add_line_item(self, section, name, amount, is_total=False):
-        """Add a line item to a section.  Wraps totals in a bordered widget."""
+    def add_line_item(self, section, name, amount, is_total=False, text_color=None):
+        """Add a line item to a section with color coding.
+        Revenue items are green, expense items are red."""
+        if text_color is None:
+            if "revenue" in section.layout().itemAt(0).widget().text().lower():
+                text_color = "#50C878"  # Green for revenue
+            else:
+                text_color = "#FF6B6B"  # Red for expenses
+
         if is_total:
             # Create a wrapper widget for the total
             wrapper = QWidget()
@@ -203,7 +139,7 @@ class IncomeStatementWindow(QWidget):
             # --- Top Border Line ---
             top_line = QWidget()
             top_line.setFixedHeight(1)  # Set a fixed height for the line
-            top_line.setStyleSheet("background-color: #555;")  # Set the line color
+            top_line.setStyleSheet(f"background-color: {text_color};")  # Set the line color to match text
             wrapper_layout.addWidget(top_line)
 
             item = QWidget()
@@ -213,10 +149,13 @@ class IncomeStatementWindow(QWidget):
             name_label = QLabel(format_table_name(name))
             amount_label = QLabel(f"$ {abs(amount):.2f}")
             amount_label.setAlignment(Qt.AlignRight)
-            amount_label.setStyleSheet("""
+            amount_label.setStyleSheet(f"""
                 font-family: 'Consolas', monospace;
-                font-weight: bold; /* Make total amounts bold */
+                font-weight: bold;
+                color: {text_color};
             """)
+            
+            name_label.setStyleSheet(f"font-weight: bold; color: {text_color};")
 
             layout.addWidget(name_label)
             layout.addStretch()
@@ -227,12 +166,11 @@ class IncomeStatementWindow(QWidget):
             # --- Bottom Border Line ---
             bottom_line = QWidget()
             bottom_line.setFixedHeight(1)  # Set a fixed height for the line
-            bottom_line.setStyleSheet("background-color: #555;")  # Set the line color
+            bottom_line.setStyleSheet(f"background-color: {text_color};")  # Set the line color to match text
             wrapper_layout.addWidget(bottom_line)
 
-
             section.layout().addWidget(wrapper)  # Add the wrapper
-            return abs(amount)
+            return amount  # Return the actual amount, not abs value
 
         else:
             # Regular line item (no wrapper needed)
@@ -243,16 +181,19 @@ class IncomeStatementWindow(QWidget):
             name_label = QLabel(format_table_name(name))
             amount_label = QLabel(f"$ {abs(amount):.2f}")
             amount_label.setAlignment(Qt.AlignRight)
-            amount_label.setStyleSheet("""
+            amount_label.setStyleSheet(f"""
                 font-family: 'Consolas', monospace;
+                color: {text_color};
             """)
+            
+            name_label.setStyleSheet(f"color: {text_color};")
 
             layout.addWidget(name_label)
             layout.addStretch()
             layout.addWidget(amount_label)
 
             section.layout().addWidget(item)
-            return abs(amount)
+            return amount  # Return the actual amount, not abs value
 
     def apply_styles(self):
         """Apply global styles to the window."""
@@ -276,8 +217,6 @@ class IncomeStatementWindow(QWidget):
             }
         """)
 
-
-
     def select_period(self):
         """Opens period selection dialog"""
         crud = GenericCRUD("accounting_periods")
@@ -290,77 +229,108 @@ class IncomeStatementWindow(QWidget):
             self.generate_report()
 
     def generate_report(self):
-            """Generates and displays the income statement"""
-            if not self.start_date or not self.end_date:
-                QMessageBox.warning(self, "Error", "Please select an accounting period.")
-                return
+        """Generates and displays the income statement with color coding"""
+        if not self.start_date or not self.end_date:
+            QMessageBox.warning(self, "Error", "Please select an accounting period.")
+            return
 
-            try:
-                # Clear previous content
-                while self.revenue_section.layout().count() > 1:  # Keep the title
-                    item = self.revenue_section.layout().takeAt(1)
-                    if item.widget():
-                        item.widget().deleteLater()
-                while self.expenses_section.layout().count() > 1:
-                    item = self.expenses_section.layout().takeAt(1)
-                    if item.widget():
-                        item.widget().deleteLater()
+        try:
+            # Clear previous content
+            while self.revenue_section.layout().count() > 1:  # Keep the title
+                item = self.revenue_section.layout().takeAt(1)
+                if item.widget():
+                    item.widget().deleteLater()
+            while self.expenses_section.layout().count() > 1:
+                item = self.expenses_section.layout().takeAt(1)
+                if item.widget():
+                    item.widget().deleteLater()
+                    
+            # Clear the existing Net Income widget if it exists
+            if hasattr(self, 'net_income_wrapper'):
+                if self.content_layout.indexOf(self.net_income_wrapper) != -1:
+                    self.content_layout.removeWidget(self.net_income_wrapper)
+                    self.net_income_wrapper.deleteLater()
 
-                report_data = generate_income_statement_data(self.start_date, self.end_date)
+            # Use the core function to ensure consistent calculations
+            report_data = generate_income_statement_data(self.start_date, self.end_date)
 
-                if report_data:
-                    # Add Revenue items
-                    total_revenue = 0
-                    for account, amount in report_data['Revenues']:
-                        self.add_line_item(self.revenue_section, account, amount)
-                        total_revenue += amount
-                    self.add_line_item(self.revenue_section, "Total Revenue", total_revenue, True)
+            if report_data:
+                # Add Revenue items with green color
+                revenue_color = "#50C878"  # Green for revenue
+                total_revenue = 0
+                for account, amount in report_data['Revenues']:
+                    self.add_line_item(self.revenue_section, account, amount, text_color=revenue_color)
+                    total_revenue += amount
+                self.add_line_item(self.revenue_section, "Total Revenue", total_revenue, is_total=True, text_color=revenue_color)
 
-                    # Add Expense items
-                    total_expenses = 0
-                    for account, amount in report_data['Expenses']:
-                        self.add_line_item(self.expenses_section, account, amount)
-                        total_expenses += amount
-                    self.add_line_item(self.expenses_section, "Total Expenses", total_expenses, True)
+                # Add Expense items with red color
+                expense_color = "#FF6B6B"  # Red for expenses
+                total_expenses = 0
+                for account, amount in report_data['Expenses']:
+                    self.add_line_item(self.expenses_section, account, amount, text_color=expense_color)
+                    total_expenses += amount
+                self.add_line_item(self.expenses_section, "Total Expenses", total_expenses, is_total=True, text_color=expense_color)
 
-                    # Update Net Income/Loss
-                    net_income = report_data['Net Income']
-                    self.net_income_label.setText("NET INCOME" if net_income >= 0 else "NET LOSS")
-                    self.net_income_amount.setText(f"$ {abs(net_income):.2f}")
-                    self.net_income_amount.setStyleSheet("""
-                        font-family: 'Consolas', monospace;
-                        font-weight: bold;
-                    """)
+                # Get Net Income directly from the report data
+                net_income = report_data['Net Income']
+                
+                # Determine color based on whether it's income or loss
+                net_color = "#50C878" if net_income >= 0 else "#FF6B6B"  # Green for profit, red for loss
 
-                    # --- Wrap Net Income/Loss in a bordered widget (CORRECTED) ---
-                    wrapper = QWidget()
-                    wrapper_layout = QVBoxLayout(wrapper)
-                    wrapper_layout.setContentsMargins(0, 0, 0, 0)
-                    wrapper_layout.setSpacing(0)
+                # Create a new net income widget
+                self.net_income_wrapper = QWidget()
+                wrapper_layout = QVBoxLayout(self.net_income_wrapper)
+                wrapper_layout.setContentsMargins(0, 0, 0, 0)
+                wrapper_layout.setSpacing(0)
 
-                    # Top Line
-                    top_line = QWidget()
-                    top_line.setFixedHeight(1)
-                    top_line.setStyleSheet("background-color: #555;")
-                    wrapper_layout.addWidget(top_line)  # Add top line
+                # Top Line
+                top_line = QWidget()
+                top_line.setFixedHeight(2)  # Slightly thicker for emphasis
+                top_line.setStyleSheet(f"background-color: {net_color};")
+                wrapper_layout.addWidget(top_line)
 
-                    # Add the existing net_income_widget
-                    wrapper_layout.addWidget(self.net_income_widget)
+                # Net Income Widget
+                self.net_income_widget = QWidget()
+                net_income_layout = QHBoxLayout(self.net_income_widget)
+                net_income_layout.setContentsMargins(0, 8, 0, 8)  # More padding for emphasis
+                
+                # Set appropriate label based on whether net income is positive or negative
+                self.net_income_label = QLabel("NET INCOME" if net_income >= 0 else "NET LOSS")
+                self.net_income_amount = QLabel(f"$ {abs(net_income):.2f}")
+                
+                # Style the labels with proper color
+                self.net_income_label.setStyleSheet(f"""
+                    font-weight: bold;
+                    color: {net_color};
+                    font-size: 16px;
+                """)
+                self.net_income_amount.setStyleSheet(f"""
+                    font-family: 'Consolas', monospace;
+                    font-weight: bold;
+                    color: {net_color};
+                    font-size: 16px;
+                """)
+                
+                net_income_layout.addWidget(self.net_income_label)
+                net_income_layout.addStretch()
+                net_income_layout.addWidget(self.net_income_amount)
+                
+                wrapper_layout.addWidget(self.net_income_widget)
 
-                    # Bottom Line
-                    bottom_line = QWidget()
-                    bottom_line.setFixedHeight(1)
-                    bottom_line.setStyleSheet("background-color: #555;")
-                    wrapper_layout.addWidget(bottom_line) # Add bottom line
+                # Bottom Line
+                bottom_line = QWidget()
+                bottom_line.setFixedHeight(2)  # Slightly thicker for emphasis
+                bottom_line.setStyleSheet(f"background-color: {net_color};")
+                wrapper_layout.addWidget(bottom_line)
 
-                    self.content_layout.addWidget(wrapper) #add wrapper to layout
+                # Add the wrapper to the content layout
+                self.content_layout.addWidget(self.net_income_wrapper)
 
+            else:
+                QMessageBox.warning(self, "Report Generation", "No data found for the selected period.")
 
-                else:
-                    QMessageBox.warning(self, "Report Generation", "No data found for the selected period.")
-
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to generate report: {e}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to generate report: {e}")
 
     def show_report_on_main_window(self):
         self.main_window.setCentralWidget(self)

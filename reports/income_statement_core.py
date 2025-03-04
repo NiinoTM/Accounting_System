@@ -8,6 +8,7 @@ def generate_income_statement_data(start_date, end_date):
     db_manager = DatabaseManager()
     try:
         with db_manager as db:
+            # Query to get transaction data with correct sign based on account type
             db.cursor.execute("""
                 SELECT
                     a.name AS account_name,
@@ -38,17 +39,25 @@ def generate_income_statement_data(start_date, end_date):
                 balance = row['balance']
 
                 if account_type == 'Revenue':
-                    revenues.append((account_name, balance))
-                    total_revenue += balance
+                    # Revenue accounts normally have credit balances (negative in our query)
+                    # So we negate the balance to show revenue as positive
+                    adjusted_balance = -balance
+                    revenues.append((account_name, adjusted_balance))
+                    total_revenue += adjusted_balance
                 elif account_type == 'Expense':
+                    # Expense accounts normally have debit balances (positive in our query)
+                    # So we keep the balance as is (already positive)
                     expenses.append((account_name, balance))
                     total_expenses += balance
 
+            # Calculate net income: revenue MINUS expenses
             net_income = total_revenue - total_expenses
 
             return {
                 'Revenues': revenues,
                 'Expenses': expenses,
+                'Total Revenue': total_revenue,
+                'Total Expenses': total_expenses,
                 'Net Income': net_income
             }
 

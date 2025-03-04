@@ -12,3 +12,7 @@ main.build/
 main.onefile-build/
 
 main.build/
+
+dist/
+
+build/
