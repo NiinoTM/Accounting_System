@@ -154,7 +154,7 @@ class RecordLiabilitySettlementWindow(QWidget):
 
                 # --- 2. Update debtor_creditor amount (Add) ---
                 db.cursor.execute(
-                    "UPDATE debtor_creditor SET amount = amount + ? WHERE id = ?",  # ADD for outflow
+                    "UPDATE debtor_creditor SET amount = amount - ? WHERE id = ?",  # Deduct for outflow
                     (amount, creditor_id)
                 )
 

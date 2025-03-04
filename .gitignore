@@ -6,3 +6,6 @@ __pycache__/
 *.pyd
 
 credentials.json
+
+backups/
+
