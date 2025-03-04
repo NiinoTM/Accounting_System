@@ -1,12 +1,14 @@
-# --- START OF FILE transactions_actions.py ---
-
 # menu/transactions_actions.py
 import sqlite3
-from PySide6.QtWidgets import QMenu, QMessageBox, QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QPushButton, QLineEdit, QLabel, QDialogButtonBox, QAbstractItemView
+from PySide6.QtWidgets import QMenu, QHBoxLayout, QMessageBox, QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QPushButton, QLineEdit, QLabel, QDialogButtonBox, QAbstractItemView
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QHeaderView  # Import QHeaderView
 from utils.crud.transactions_crud import TransactionsCRUD
-from utils.crud.template_transactions_crud import TemplateTransactionCRUD  # Import for template listing
-from utils.crud.date_select import DateSelectWindow #import DateSelectWindow
+from utils.crud.template_transactions_crud import TemplateTransactionCRUD
+from utils.crud.date_select import DateSelectWindow
+from utils.crud.search_dialog import AdvancedSearchDialog
+from utils.formatters import format_table_name  # Import the formatter
+
 
 class TransactionsActions:
     def __init__(self, main_window):
@@ -49,63 +51,38 @@ class TransactionsActions:
 
     def add_transaction_from_template(self):
         """Handles adding transactions from a selected template."""
-        # --- Step 1:  Show Template List ---
-        dialog = QDialog(self.main_window)
-        dialog.setWindowTitle("Select Transaction Template")
-        layout = QVBoxLayout()
-        dialog.setLayout(layout)
+        # --- Step 1: Show Template List using AdvancedSearchDialog ---
+        search_dialog = AdvancedSearchDialog(
+            field_type='generic',
+            parent=self.main_window,
+            db_path=self.transactions_crud.db_path,  # Use the transactions CRUD's db_path
+            table_name='transaction_templates'  # Specify the table for templates
+        )
 
-        table = QTableWidget()
-        layout.addWidget(table)
+        if search_dialog.exec() == QDialog.Accepted:
+            selected_template = search_dialog.get_selected_item()
+            if selected_template:
+                # --- Proceed with the selected template ---
+                self._show_transaction_edit_dialog(selected_template['id'])
 
-        # Fetch and display templates
-        self.template_crud.conn.row_factory = sqlite3.Row # ensure row factory
-        self.template_crud.cursor = self.template_crud.conn.cursor()
-        self.template_crud.cursor.execute("SELECT * FROM transaction_templates")
-        templates = self.template_crud.cursor.fetchall()
-
-        table.setRowCount(len(templates))
-        table.setColumnCount(3)  # ID, Name, Actions
-        table.setHorizontalHeaderLabels(["ID", "Template Name", "Actions"])
-
-        for row_idx, template in enumerate(templates):
-            table.setItem(row_idx, 0, QTableWidgetItem(str(template['id'])))
-            table.setItem(row_idx, 1, QTableWidgetItem(template['name']))
-
-            # --- View Details Button ---
-            view_details_button = QPushButton("View Details")
-            view_details_button.clicked.connect(lambda checked, tid=template['id']: self.template_crud.show_template_details(self.main_window, str(tid)))
-            table.setCellWidget(row_idx, 2, view_details_button)
-
-        # --- Confirm Selection and Proceed ---
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(lambda: self._confirm_template_selection(dialog, table))
-        button_box.rejected.connect(dialog.reject)
-        layout.addWidget(button_box)
-
-        dialog.exec()
-
-    def _confirm_template_selection(self, dialog, table):
-        """Handles confirming the template and showing the transaction editing dialog."""
-        selected_row = table.currentRow()
-        if selected_row == -1:
-            QMessageBox.warning(dialog, "No Template Selected", "Please select a template.")
-            return
-
-        template_id = table.item(selected_row, 0).text()
-        dialog.accept()  # Close the template selection dialog
-        self._show_transaction_edit_dialog(template_id)
 
     def _show_transaction_edit_dialog(self, template_id):
         """Displays a dialog to edit transaction amounts from the selected template."""
         dialog = QDialog(self.main_window)
         dialog.setWindowTitle("Edit Transaction Amounts")
+        dialog.setMinimumSize(800, 400)  # Set a reasonable minimum size!
         layout = QVBoxLayout()
         dialog.setLayout(layout)
 
         table = QTableWidget()
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)  # Initially not editable
         layout.addWidget(table)
+
+        # --- CRITICAL FIX: Set row_factory here, before the execute call ---
+        self.template_crud.conn.row_factory = sqlite3.Row
+        self.template_crud.cursor = self.template_crud.conn.cursor()  # Ensure we have a fresh cursor
+
+
         # Fetch template transactions and details, using debited/credited
         self.template_crud.cursor.execute("""
             SELECT tt.description, ttd.debited, ttd.credited, ttd.amount,
@@ -124,10 +101,21 @@ class TransactionsActions:
         table.setColumnCount(6)
         table.setHorizontalHeaderLabels(["Description", "Debited Account", "Credited Account", "Amount", "", ""])  # Edit/Delete
 
+        # --- Column Sizing ---
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.Stretch)  # Description stretches
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # Debited Account
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # Credited Account
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents) #amount
+        header.setSectionResizeMode(4, QHeaderView.Fixed)  # Edit button - fixed size
+        header.setSectionResizeMode(5, QHeaderView.Fixed) #empty label
+        header.resizeSection(4, 80)   # Set a reasonable width for the Edit button
+        header.resizeSection(5, 20)
+
         self.transaction_data_for_creation = []  # Store prepared transactions
 
         for row_idx, trans in enumerate(transactions):
-            # Store all necessary data.
+            # Store all necessary data.  Now trans is an sqlite3.Row object.
             transaction_data = {
                 'description': trans['description'],
                 'debited': trans['debited'],
@@ -164,26 +152,112 @@ class TransactionsActions:
         dialog.exec()
 
     def _edit_transaction_amount(self, table, row):
-        """Allows editing the amount of a single transaction in the table."""
+        """Allows editing ALL fields of a single transaction."""
         transaction = self.transaction_data_for_creation[row]
 
-        # Create a small dialog for editing the amount
+        # Create a dialog for editing
         dialog = QDialog()
-        dialog.setWindowTitle("Edit Amount")
+        dialog.setWindowTitle("Edit Transaction")
         layout = QVBoxLayout()
         dialog.setLayout(layout)
 
-        amount_label = QLabel("Amount:")
-        amount_input = QLineEdit(transaction['amount'])  # Pre-fill with current amount
-        layout.addWidget(amount_label)
+        # --- 1. Description ---
+        layout.addWidget(QLabel("Description:"))
+        description_input = QLineEdit(transaction['description'])
+        layout.addWidget(description_input)
+
+        # --- 2. Debited Account ---
+        layout.addWidget(QLabel("Debited Account:"))
+        debited_display = QLineEdit(transaction['debit_name'] + " (" + transaction['debit_code'] + ")")
+        debited_display.setReadOnly(True)
+        debited_search_button = QPushButton("Search")
+        debited_layout = QHBoxLayout()
+        debited_layout.addWidget(debited_display)
+        debited_layout.addWidget(debited_search_button)
+        layout.addLayout(debited_layout)
+        debited_account_id = transaction['debited']  # Store current ID
+
+        def handle_debited_search():
+            nonlocal debited_account_id  # Access and modify the outer variable
+            search_dialog = AdvancedSearchDialog(
+                field_type='generic', parent=dialog, db_path=self.transactions_crud.db_path, table_name='accounts'
+            )
+            if search_dialog.exec() == QDialog.Accepted:
+                selected = search_dialog.get_selected_item()
+                if selected:
+                    debited_display.setText(f"{selected['name']} ({selected['code']})")
+                    debited_account_id = selected['id']  # Update the ID
+
+        debited_search_button.clicked.connect(handle_debited_search)
+
+
+        # --- 3. Credited Account ---
+        layout.addWidget(QLabel("Credited Account:"))
+        credited_display = QLineEdit(transaction['credit_name'] + " (" + transaction['credit_code'] + ")")
+        credited_display.setReadOnly(True)
+        credited_search_button = QPushButton("Search")
+        credited_layout = QHBoxLayout()
+        credited_layout.addWidget(credited_display)
+        credited_layout.addWidget(credited_search_button)
+        layout.addLayout(credited_layout)
+        credited_account_id = transaction['credited']  # Store current ID
+
+        def handle_credited_search():
+            nonlocal credited_account_id
+            search_dialog = AdvancedSearchDialog(
+                field_type='generic', parent=dialog, db_path=self.transactions_crud.db_path, table_name='accounts'
+            )
+            if search_dialog.exec() == QDialog.Accepted:
+                selected = search_dialog.get_selected_item()
+                if selected:
+                    credited_display.setText(f"{selected['name']} ({selected['code']})")
+                    credited_account_id = selected['id']  # Update the ID
+        credited_search_button.clicked.connect(handle_credited_search)
+
+        # --- 4. Amount ---
+        layout.addWidget(QLabel("Amount:"))
+        amount_input = QLineEdit(transaction['amount'])
         layout.addWidget(amount_input)
 
+        # --- Buttons ---
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(lambda: self._update_amount_and_table(transaction, amount_input.text(), table, row, dialog))
+        button_box.accepted.connect(lambda: self._update_transaction_and_table(
+            row, description_input.text(), debited_account_id, debited_display.text(),
+            credited_account_id, credited_display.text(), amount_input.text(), table, dialog
+        ))
         button_box.rejected.connect(dialog.reject)
         layout.addWidget(button_box)
 
         dialog.exec()
+
+
+    def _update_transaction_and_table(self, row, new_description, new_debited_id, new_debited_display,
+                                      new_credited_id, new_credited_display, new_amount, table, dialog):
+        """Updates the transaction data and the table."""
+        try:
+            float(new_amount)  # Validate amount
+            transaction = self.transaction_data_for_creation[row]
+            transaction['description'] = new_description
+            transaction['debited'] = new_debited_id
+            transaction['credited'] = new_credited_id
+            transaction['amount'] = new_amount
+            #  Update display names/codes (very important!)
+            transaction['debit_name'] = new_debited_display.split(" (")[0]  # Extract name
+            transaction['debit_code'] = new_debited_display.split(" (")[1][:-1]  # Extract code
+            transaction['credit_name'] = new_credited_display.split(" (")[0]
+            transaction['credit_code'] = new_credited_display.split(" (")[1][:-1]
+
+
+            # Update the table
+            table.setItem(row, 0, QTableWidgetItem(new_description))
+            table.setItem(row, 1, QTableWidgetItem(new_debited_display))
+            table.setItem(row, 2, QTableWidgetItem(new_credited_display))
+            table.setItem(row, 3, QTableWidgetItem(new_amount))
+
+            dialog.accept()
+        except ValueError:
+            QMessageBox.warning(dialog, "Invalid Amount", "Please enter a valid number for the amount.")
+
 
     def _update_amount_and_table(self, transaction, new_amount, table, row, dialog):
         """Updates the transaction data and the table with the new amount."""

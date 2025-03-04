@@ -156,7 +156,7 @@ class RegisterAssetTransferInflowWindow(QWidget):
 
                 # --- 2. Update debtor_creditor amount (Deduct) ---
                 db.cursor.execute(
-                    "UPDATE debtor_creditor SET amount = amount - ? WHERE id = ?",  # DEDUCT for inflow
+                    "UPDATE debtor_creditor SET amount = amount + ? WHERE id = ?",  # ADD for inflow
                     (amount, creditor_id)
                 )
 
