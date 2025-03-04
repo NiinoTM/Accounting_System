@@ -222,7 +222,9 @@ class DatabaseManager:
             ('Long-term Liability', 'CREDIT', 'Debts due after one year'),
             ('Equity', 'CREDIT', "Owner's stake in the business"),
             ('Revenue', 'CREDIT', 'Income from business activities'),
-            ('Expense', 'DEBIT', 'Costs incurred in business operations')
+            ('Expense', 'DEBIT', 'Costs incurred in business operations'),
+            ('Net Income', 'DEBIT', 'Profit for the period'),
+            ('Net Loss', 'CREDIT', 'Loss for the period')
         ]
 
     def initialize_database(self) -> bool:

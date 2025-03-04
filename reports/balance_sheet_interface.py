@@ -287,8 +287,8 @@ class BalanceSheetWindow(QWidget):
 
             # Clear previous content
             for section in [self.current_assets_section, self.fixed_assets_section,
-                          self.current_liab_section, self.noncurrent_liab_section,
-                          self.equity_section]:
+                        self.current_liab_section, self.noncurrent_liab_section,
+                        self.equity_section]:
                 while section.layout().count() > 1:  # Keep the title
                     item = section.layout().takeAt(1)
                     if item.widget():
@@ -299,56 +299,63 @@ class BalanceSheetWindow(QWidget):
                                                         item['name'], 
                                                         item['balance'],
                                                         is_right_side=False)
-                                     for item in ativos_circulantes)
+                                    for item in ativos_circulantes)
             if total_current_assets != 0:
                 self.add_subtotal(self.current_assets_section, "Total Current Assets", 
                                 total_current_assets, is_right_side=False)
 
             total_fixed_assets = sum(self.add_line_item(self.fixed_assets_section, 
-                                                      item['name'], 
-                                                      item['balance'],
-                                                      is_right_side=False)
-                                   for item in ativos_fixos)
+                                                    item['name'], 
+                                                    item['balance'],
+                                                    is_right_side=False)
+                                for item in ativos_fixos)
             if total_fixed_assets != 0:
                 self.add_subtotal(self.fixed_assets_section, "Total Fixed Assets", 
                                 total_fixed_assets, is_right_side=False)
 
             # Add new content - Liabilities (right side)
             total_current_liab = sum(self.add_line_item(self.current_liab_section, 
-                                                      item['name'], 
-                                                      item['balance'],
-                                                      is_right_side=True)
-                                   for item in passivos_circulantes)
+                                                    item['name'], 
+                                                    item['balance'],
+                                                    is_right_side=True)
+                                for item in passivos_circulantes)
             if total_current_liab != 0:
                 self.add_subtotal(self.current_liab_section, "Total Current Liabilities", 
                                 total_current_liab, is_right_side=True)
 
             total_noncurrent_liab = sum(self.add_line_item(self.noncurrent_liab_section, 
-                                                         item['name'], 
-                                                         item['balance'],
-                                                         is_right_side=True)
-                                      for item in passivos_nao_circulantes)
+                                                        item['name'], 
+                                                        item['balance'],
+                                                        is_right_side=True)
+                                    for item in passivos_nao_circulantes)
             if total_noncurrent_liab != 0:
                 self.add_subtotal(self.noncurrent_liab_section, "Total Non-Current Liabilities", 
                                 total_noncurrent_liab, is_right_side=True)
 
-            # Add equity items including net income/loss (right side)
+            # Add equity items (right side)
             total_equity = sum(self.add_line_item(self.equity_section, 
                                                 item['name'], 
                                                 item['balance'],
                                                 is_right_side=True)
-                             for item in patrimonio)
+                            for item in patrimonio)
             
             # Add net income/loss to equity section if not zero
             if net_income != 0:
+                # Display the income with proper sign for the right side (liabilities & equity)
+                # For right side display, we negate the value
+                income_display_value = -net_income
+                
+                # Add the line item with the display value
                 self.add_line_item(self.equity_section, 
-                                 "Net Income" if net_income >= 0 else "Net Loss", 
-                                 -net_income,
-                                 is_right_side=True)
-                if net_income >= 0:
-                    total_equity += net_income
-                else:
-                    total_equity -= net_income
+                                "Net Income" if net_income >= 0 else "Net Loss", 
+                                income_display_value,
+                                is_right_side=True)
+                
+                # For calculation purposes:
+                # - Positive net_income should make equity more positive (or less negative)
+                # - Negative net_income (loss) should make equity more negative
+                # Since income_display_value is already negated, we add it directly
+                total_equity += income_display_value
 
             if total_equity != 0:
                 self.add_subtotal(self.equity_section, "Total Equity", 
