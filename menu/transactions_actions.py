@@ -7,6 +7,8 @@ from utils.crud.transactions_crud import TransactionsCRUD
 from utils.crud.template_transactions_crud import TemplateTransactionCRUD
 from utils.crud.date_select import DateSelectWindow
 from utils.crud.search_dialog import AdvancedSearchDialog
+# Import the new filter dialog
+from utils.crud.transaction_filter_dialog import TransactionFilterDialog
 from utils.formatters import format_table_name  # Import the formatter
 
 
@@ -26,7 +28,8 @@ class TransactionsActions:
         self.add_from_template_action.triggered.connect(self.add_transaction_from_template)
 
         self.view_transactions_action = self.transactions_menu.addAction("View Transactions")
-        self.view_transactions_action.triggered.connect(self.view_transactions)
+        # Connect to the new method that opens the filter dialog
+        self.view_transactions_action.triggered.connect(self.show_transaction_filter)
 
         self.edit_transaction_action = self.transactions_menu.addAction("Edit Transaction")
         self.edit_transaction_action.triggered.connect(self.edit_transaction)
@@ -34,14 +37,24 @@ class TransactionsActions:
         self.delete_transaction_action = self.transactions_menu.addAction("Delete Transaction")
         self.delete_transaction_action.triggered.connect(self.delete_transaction)
 
-
-
-
     def add_transaction(self):
         self.transactions_crud.create(self.main_window)
 
+    def show_transaction_filter(self): # Renamed from view_transactions
+        """Opens the filter dialog and then displays transactions."""
+        dialog = TransactionFilterDialog(self.main_window)
+        if dialog.exec() == QDialog.Accepted:
+            filters = dialog.get_filters()
+            if filters: # Ensure filters are valid
+                # Call the CRUD read method with the filters
+                self.transactions_crud.read(self.main_window, filters=filters)
+
     def view_transactions(self):
-        self.transactions_crud.read(self.main_window)
+        # This method is now effectively replaced by show_transaction_filter
+        # You can keep it if you want an unfiltered view option elsewhere,
+        # or remove it if show_transaction_filter is the only way to view.
+        # For now, let's call the filter dialog from here too for consistency if triggered elsewhere.
+        self.show_transaction_filter()
 
     def edit_transaction(self):
         self.transactions_crud.edit(self.main_window)
