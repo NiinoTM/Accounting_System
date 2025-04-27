@@ -1,6 +1,5 @@
-~~1. Create Fixed Asset~~
-~~2. Create CashFlow Forecast~~
+> Include in the transaction sql table a field to confirm that it was a debtor creditor transaction so that it can only be deleted or edited from the specific menu that relates to that.
 3. Create Index & Economic Rates
-4. Create automatic transaction from a frequency
 5. Order itens in BalanceSheet according to CODE
 6. Create forecast for cashflow.
+7. Create an export function for income, balance sheet and other reports as an html for later consultation.
