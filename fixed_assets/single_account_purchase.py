@@ -263,10 +263,10 @@ class SingleAccountPurchaseWindow(QWidget):
                 description = f"{asset_name} - Purchase"
                 db.cursor.execute(
                     """
-                    INSERT INTO transactions (date, description, debited, credited, amount)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO transactions (date, description, debited, credited, amount, source_type)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                    (purchase_date_str, description, account_id, self.selected_payment_account['id'], original_cost)
+                    (purchase_date_str, description, account_id, self.selected_payment_account['id'], original_cost, 'FIXED_ASSET')
                 )
 
                 # --- Update Account Balances ---

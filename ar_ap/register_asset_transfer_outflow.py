@@ -164,8 +164,8 @@ class RegisterAssetTransferOutflowWindow(QWidget):
 
                 # --- 4. Insert into transactions table ---
                 db.cursor.execute(
-                    "INSERT INTO transactions (date, description, debited, credited, amount) VALUES (?, ?, ?, ?, ?)",
-                    (date, details, ar_account_id, asset_id, amount)  # Use 'details'
+                    "INSERT INTO transactions (date, description, debited, credited, amount, source_type) VALUES (?, ?, ?, ?, ?, ?)",
+                    (date, details, ar_account_id, asset_id, amount, 'DEBTOR_CREDITOR')  # Use 'details'
                 )
 
                 # --- 5. Update Account Balances ---

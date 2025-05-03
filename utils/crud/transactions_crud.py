@@ -6,9 +6,7 @@ import sqlite3
 from PySide6.QtWidgets import (QMessageBox, QComboBox, QDialog, QHBoxLayout,
                               QVBoxLayout, QLineEdit, QPushButton, QLabel,
                               QTableWidget, QTableWidgetItem, QHeaderView) # Keep HeaderView
-# Import QLocale for handling number formatting issues
 from PySide6.QtCore import Qt, QDate, QLocale
-# QDoubleValidator is not imported as it's removed below
 from .generic_crud import GenericCRUD
 from .search_dialog import AdvancedSearchDialog
 from .date_select import DateSelectWindow
@@ -18,13 +16,11 @@ class TransactionsCRUD(GenericCRUD):
     def __init__(self):
         super().__init__('transactions')
         # Set row factory for the connection used by this instance
-        # This makes cursor.fetchone() and fetchall() return Row objects
-        # which allow access by column name (like a dictionary) and index.
         self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor() # Ensure cursor uses the row factory
 
     def read(self, main_window, filters=None):
-        """Read and display transactions, optionally filtered, with improved layout."""
+        """Read and display transactions, including source type."""
         base_query = """
             SELECT
                 t.id,
@@ -32,7 +28,8 @@ class TransactionsCRUD(GenericCRUD):
                 t.description,
                 da.name AS debited_account_name,
                 ca.name AS credited_account_name,
-                t.amount
+                t.amount,
+                t.source_type  -- Fetch source_type
             FROM transactions t
             JOIN accounts da ON t.debited = da.id
             JOIN accounts ca ON t.credited = ca.id
@@ -42,37 +39,29 @@ class TransactionsCRUD(GenericCRUD):
 
         # --- Filter processing ---
         if filters:
-            # Add date range filters if provided
             if filters.get('start_date'):
                 where_clauses.append("t.date >= ?")
                 params.append(filters['start_date'])
             if filters.get('end_date'):
                 where_clauses.append("t.date <= ?")
                 params.append(filters['end_date'])
-
-            # Add account ID filter if provided
             if filters.get('account_ids'):
                 account_ids = filters['account_ids']
-                if account_ids: # Only add clause if list is not empty or None
+                if account_ids:
                     placeholders = ', '.join('?' * len(account_ids))
                     where_clauses.append(f"(t.debited IN ({placeholders}) OR t.credited IN ({placeholders}))")
                     params.extend(account_ids)
                     params.extend(account_ids)
-
-            # Get limit, defaulting to 15
             limit = filters.get('limit', 15)
-            if not isinstance(limit, int) or limit <= 0:
-                limit = 1
+            if not isinstance(limit, int) or limit <= 0: limit = 15
         else:
             limit = 15
 
-        # Construct WHERE clause if any filters exist
         if where_clauses:
             query = f"{base_query} WHERE {' AND '.join(where_clauses)}"
         else:
             query = base_query
 
-        # Add ORDER BY and LIMIT clauses
         query += " ORDER BY t.date DESC, t.id DESC"
         query += " LIMIT ?"
         params.append(limit)
@@ -86,7 +75,8 @@ class TransactionsCRUD(GenericCRUD):
             # --- Display in Table ---
             table = QTableWidget(main_window)
             table.setObjectName("transactionsViewTable")
-            columns = ["ID", "Date", "Description", "Debited Account", "Credited Account", "Amount"]
+            # Add "Source Type" column
+            columns = ["ID", "Date", "Description", "Debited Account", "Credited Account", "Amount", "Source Type"]
             table.setRowCount(len(records))
             table.setColumnCount(len(columns))
             table.setHorizontalHeaderLabels(columns)
@@ -94,7 +84,6 @@ class TransactionsCRUD(GenericCRUD):
             table.setSortingEnabled(False)
             table.verticalHeader().setVisible(False)
             table.setAlternatingRowColors(True)
-
             table.setWordWrap(True)
             table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
@@ -112,23 +101,35 @@ class TransactionsCRUD(GenericCRUD):
                  except (ValueError, TypeError):
                      amount_str = str(record_row['amount'] or '0.00')
                  amount_item = QTableWidgetItem(amount_str)
-                 amount_item.setTextAlignment(Qt.AlignCenter)
+                 amount_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter) # Align amount right
                  table.setItem(row_idx, 5, amount_item)
+                 # Populate the new Source Type column
+                 source_type_item = QTableWidgetItem(str(record_row['source_type']))
+                 source_type_item.setTextAlignment(Qt.AlignCenter)
+                 table.setItem(row_idx, 6, source_type_item)
+
 
             # --- Column Sizing Strategy ---
             header = table.horizontalHeader()
+            # Make columns interactive initially for user resizing
             for i in range(table.columnCount()):
                 header.setSectionResizeMode(i, QHeaderView.Interactive)
+            # Resize based on content first
             table.resizeColumnsToContents()
-            if table.columnWidth(0) < 60: table.setColumnWidth(0, 60)
-            if table.columnWidth(1) < 90: table.setColumnWidth(1, 90)
-            if table.columnWidth(5) < 100: table.setColumnWidth(5, 100)
-            if table.columnWidth(2) < 200: table.setColumnWidth(2, 200)
-            if table.columnWidth(3) < 150: table.setColumnWidth(3, 150)
-            if table.columnWidth(4) < 150: table.setColumnWidth(4, 150)
+            # Set minimum widths for better readability
+            if table.columnWidth(0) < 60: table.setColumnWidth(0, 60)   # ID
+            if table.columnWidth(1) < 90: table.setColumnWidth(1, 90)   # Date
+            if table.columnWidth(5) < 100: table.setColumnWidth(5, 100) # Amount
+            if table.columnWidth(6) < 100: table.setColumnWidth(6, 100) # Source Type
+            # Allow Description, Debited, Credited to be wider
+            if table.columnWidth(2) < 200: table.setColumnWidth(2, 200) # Description
+            if table.columnWidth(3) < 150: table.setColumnWidth(3, 150) # Debited
+            if table.columnWidth(4) < 150: table.setColumnWidth(4, 150) # Credited
+            # Optional: Set Description to stretch if desired after initial sizing
+            # header.setSectionResizeMode(2, QHeaderView.Stretch)
 
             table.resizeRowsToContents()
-            table.setSortingEnabled(True)
+            table.setSortingEnabled(True) # Allow sorting after population
             main_window.setCentralWidget(table)
             main_window.setWindowTitle("FinTrack - View Transactions")
 
@@ -140,39 +141,40 @@ class TransactionsCRUD(GenericCRUD):
 
     # --- _create_input_fields method ---
     def _create_input_fields(self, columns, dialog, record=None):
-        """Creates input fields for the add/edit dialog, pre-filling if 'record' is provided."""
+        """Creates input fields, ignoring source_type."""
         inputs = {}
         layout = dialog.layout()
 
-        # --- Fetch Full Details for Editing ---
         record_data = None
-        record_id_for_fetch = None
         if record:
-            try: record_id_for_fetch = record['id']
-            except (KeyError, TypeError): print("Warning: 'id' key not found or invalid record object passed to _create_input_fields.")
-            if record_id_for_fetch is not None:
-                try:
-                    temp_cursor = self.conn.cursor()
-                    temp_cursor.row_factory = sqlite3.Row
-                    temp_cursor.execute("""
-                        SELECT
-                            t.id, t.date, t.description, t.amount,
-                            t.debited as debited_id, t.credited as credited_id,
-                            da.name as debit_name, da.code as debit_code,
-                            ca.name as credit_name, ca.code as credit_code
-                        FROM transactions t
-                        LEFT JOIN accounts da ON t.debited = da.id
-                        LEFT JOIN accounts ca ON t.credited = ca.id
-                        WHERE t.id = ?""", (record_id_for_fetch,))
-                    record_data = temp_cursor.fetchone()
-                except sqlite3.Error as e:
-                    print(f"Error fetching full details for edit (ID: {record_id_for_fetch}): {e}")
-                    record_data = record
+             record_id_for_fetch = None
+             try: record_id_for_fetch = record['id']
+             except (KeyError, TypeError): print("Warning: 'id' key not found or invalid record object passed to _create_input_fields.")
+             if record_id_for_fetch is not None:
+                 try:
+                     temp_cursor = self.conn.cursor()
+                     temp_cursor.row_factory = sqlite3.Row
+                     temp_cursor.execute("""
+                         SELECT
+                             t.id, t.date, t.description, t.amount,
+                             t.debited as debited_id, t.credited as credited_id,
+                             da.name as debit_name, da.code as debit_code,
+                             ca.name as credit_name, ca.code as credit_code
+                             -- No need to fetch source_type here, it's handled separately
+                         FROM transactions t
+                         LEFT JOIN accounts da ON t.debited = da.id
+                         LEFT JOIN accounts ca ON t.credited = ca.id
+                         WHERE t.id = ?""", (record_id_for_fetch,))
+                     record_data = temp_cursor.fetchone()
+                 except sqlite3.Error as e:
+                     print(f"Error fetching full details for edit (ID: {record_id_for_fetch}): {e}")
+                     record_data = record # Fallback
 
-        # --- Create Input Widgets for Each Column ---
         for idx, column in enumerate(columns):
             col_lower = column.lower()
-            if col_lower in ['id', 'created_at', 'updated_at', 'status']: continue
+            # Skip internal, timestamp, and the source_type columns
+            if col_lower in ['id', 'created_at', 'updated_at', 'status', 'source_type']:
+                continue
 
             formatted_label = format_table_name(column)
             layout.addWidget(QLabel(formatted_label))
@@ -195,15 +197,15 @@ class TransactionsCRUD(GenericCRUD):
                 field_id_value = None
                 if record_data:
                     if col_lower == 'debited':
-                         field_id_value = record_data['debited_id']
-                         debit_name = record_data['debit_name']
-                         debit_code = record_data['debit_code']
+                         field_id_value = record_data.get('debited_id')
+                         debit_name = record_data.get('debit_name')
+                         debit_code = record_data.get('debit_code')
                          if debit_name: display_field.setText(f"{debit_name} ({debit_code or '?'})")
                          elif field_id_value is not None: display_field.setText(f"Account ID: {field_id_value}")
                     elif col_lower == 'credited':
-                         field_id_value = record_data['credited_id']
-                         credit_name = record_data['credit_name']
-                         credit_code = record_data['credit_code']
+                         field_id_value = record_data.get('credited_id')
+                         credit_name = record_data.get('credit_name')
+                         credit_code = record_data.get('credit_code')
                          if credit_name: display_field.setText(f"{credit_name} ({credit_code or '?'})")
                          elif field_id_value is not None: display_field.setText(f"Account ID: {field_id_value}")
                 elif current_value is not None:
@@ -247,7 +249,7 @@ class TransactionsCRUD(GenericCRUD):
                 def create_date_handler(col_name_closure, display_widget_closure, input_dict_closure):
                     def handle_date_select():
                         date_dialog = DateSelectWindow()
-                        current_date_str = input_dict_closure[col_name_closure]['value']
+                        current_date_str = input_dict_closure[col_name_closure].get('value') if isinstance(input_dict_closure.get(col_name_closure), dict) else None
                         initial_date = QDate.currentDate()
                         if current_date_str:
                              parsed_date = QDate.fromString(current_date_str, 'yyyy-MM-dd')
@@ -256,8 +258,9 @@ class TransactionsCRUD(GenericCRUD):
                         if date_dialog.exec() == QDialog.Accepted:
                             selected_date = date_dialog.calendar.selectedDate().toString('yyyy-MM-dd')
                             display_widget_closure.setText(selected_date)
-                            if col_name_closure in input_dict_closure: input_dict_closure[col_name_closure]['value'] = selected_date
-                            else: print(f"Error: Input dictionary key '{col_name_closure}' not found for date.")
+                            if col_name_closure in input_dict_closure and isinstance(input_dict_closure[col_name_closure], dict):
+                                input_dict_closure[col_name_closure]['value'] = selected_date
+                            else: print(f"Error: Input dictionary structure invalid for date '{col_name_closure}'.")
                     return handle_date_select
                 date_button.clicked.connect(create_date_handler(column, date_input, inputs))
 
@@ -265,27 +268,12 @@ class TransactionsCRUD(GenericCRUD):
             else:
                 current_text_val = ""
                 if current_value is not None:
-                    # Use direct string conversion for pre-filling all fields, including amount
                     current_text_val = str(current_value or '')
-
                 input_field = QLineEdit(current_text_val)
-
-                # --- Amount Field Specific Logic ---
                 if col_lower == 'amount':
-                    # 1. Set Locale to C (forces '.' decimal separator for the widget)
-                    # This is crucial for ensuring input_field.text() returns a string
-                    # that uses '.' which float() can parse correctly.
-                    input_field.setLocale(QLocale.C)
-
-                    # 2. REMOVE the QDoubleValidator entirely to prevent interference
-                    #    Validation will happen during save using float() conversion.
-                    # validator = QDoubleValidator(-999999999.99, 999999999.99, 2)
-                    # validator.setNotation(QDoubleValidator.StandardNotation)
-                    # input_field.setValidator(validator)
-
+                    input_field.setLocale(QLocale.C) # Ensure '.' decimal separator
                 elif col_lower == 'description':
-                    input_field.setMaxLength(255) # Example length limit
-
+                    input_field.setMaxLength(255)
                 inputs[column] = input_field
                 layout.addWidget(input_field)
 
@@ -293,59 +281,53 @@ class TransactionsCRUD(GenericCRUD):
 
 
     # --- _get_search_type method ---
+    # (Remains the same)
     def _get_search_type(self, column_name):
-        """Determines search type (mostly for generic CRUD patterns)."""
         if column_name.lower() in ['debited', 'credited']:
-            return 'generic' # Use generic search configured for accounts
-        return 'generic' # Default
+            return 'generic'
+        return 'generic'
 
 
     # --- _format_display_text method ---
+    # (Remains the same)
     def _format_display_text(self, selected, column_name):
-        """Formats text for display after search selection."""
         if column_name.lower() in ['debited', 'credited']:
-             # Use .get for safety as 'selected' is a standard dict from search dialog
-             code = selected.get('code', 'N/A') or 'N/A' # Handle None or empty string
+             code = selected.get('code', 'N/A') or 'N/A'
              name = selected.get('name', 'N/A')
              return f"{name} ({code})"
-        # Default for other searches (e.g., searching transactions directly)
-        return selected.get('description', selected.get('name', 'N/A')) # Fallback
+        return selected.get('description', selected.get('name', 'N/A'))
 
 
     # --- _update_account_balance method ---
+    # (Remains the same)
     def _update_account_balance(self, account_id, amount, operation):
-        """Updates account balance within a transaction."""
         if account_id is None:
              print("Error: Cannot update balance for None account ID.")
              raise ValueError("Cannot update balance for a missing account ID.")
         try:
-            # Convert amount to float for calculation
             amount_float = float(amount)
         except (ValueError, TypeError) as e:
              print(f"Error: Invalid amount '{amount}' for balance update. {e}")
              raise ValueError(f"Invalid amount format for balance update: {amount}")
 
-        # Determine adjustment based on operation
         if operation == 'add': adjustment = amount_float
         elif operation == 'subtract': adjustment = -amount_float
         else: raise ValueError(f"Invalid balance update operation: {operation}")
 
         try:
-            # Execute the update using the instance cursor
             self.cursor.execute("UPDATE accounts SET balance = balance + ? WHERE id = ?", (adjustment, account_id))
-            # Optional logging
             print(f"Balance update: Account {account_id}, Operation: {operation}, Amount: {amount_float}, Adjustment: {adjustment}")
         except sqlite3.Error as e:
             print(f"DB Error updating account balance for ID {account_id}: {e}")
-            raise # Re-raise to trigger rollback in calling method
+            raise
         except Exception as e:
              print(f"Unexpected error during balance update for ID {account_id}: {e}")
-             raise # Re-raise
+             raise
 
 
     # --- _save_record method ---
     def _save_record(self, dialog, inputs, update=False, record_id=None):
-        """Saves a transaction record (insert or update) and updates account balances within a DB transaction."""
+        """Saves a transaction, setting source_type='GENERAL' for new records."""
         columns = []
         values = []
         debited_account_id = None
@@ -359,8 +341,7 @@ class TransactionsCRUD(GenericCRUD):
         for column, input_widget in inputs.items():
             col_lower = column.lower()
             value = None
-
-            if isinstance(input_widget, dict): # For fields with search/date buttons
+            if isinstance(input_widget, dict):
                 value = input_widget['value']
                 if col_lower in ['debited', 'credited'] and value is not None:
                     try: value = int(value)
@@ -393,13 +374,11 @@ class TransactionsCRUD(GenericCRUD):
                     return False
             elif col_lower == 'amount':
                  try:
-                     # Convert the text value (using '.' due to QLocale.C) to float
-                     # This is the primary validation for amount format now
                      amount = float(value)
                      if amount <= 0:
                          QMessageBox.warning(dialog, "Input Error", "Amount must be a positive number (greater than 0).")
                          return False
-                     value = amount # Use the validated float
+                     value = amount
                  except (ValueError, TypeError):
                      QMessageBox.warning(dialog, "Input Error", f"Invalid amount format: '{value}'. Please enter a valid positive number (using '.' as decimal separator).")
                      return False
@@ -430,8 +409,10 @@ class TransactionsCRUD(GenericCRUD):
             db_column_names = self.get_columns()
             db_cols_lower_set = {name.lower() for name in db_column_names}
 
-            # --- UPDATE Logic ---
+            # --- UPDATE Logic (Source Type is NOT updated) ---
             if update and record_id is not None:
+                # Fetch original details for balance reversal
+                # The check preventing edit already happened in the 'edit' method
                 self.cursor.execute("SELECT debited, credited, amount FROM transactions WHERE id = ?", (record_id,))
                 original_data = self.cursor.fetchone()
                 if not original_data:
@@ -440,18 +421,21 @@ class TransactionsCRUD(GenericCRUD):
                 original_credited = original_data['credited']
                 original_amount = original_data['amount']
 
+                # Reverse original balance impact
                 if original_debited is not None and original_amount is not None:
                     self._update_account_balance(original_debited, original_amount, 'subtract')
                 if original_credited is not None and original_amount is not None:
                     self._update_account_balance(original_credited, original_amount, 'add')
 
+                # Prepare UPDATE statement, excluding source_type
                 update_columns_clause = []
                 update_values = []
                 col_val_dict = dict(zip(columns, values))
 
                 for col in columns:
                      col_lower = col.lower()
-                     if col_lower in db_cols_lower_set and col_lower not in ['id', 'created_at', 'updated_at']:
+                     # Only update columns that exist in the table and are not internal/timestamp/source_type
+                     if col_lower in db_cols_lower_set and col_lower not in ['id', 'created_at', 'updated_at', 'source_type']:
                          update_columns_clause.append(f"{col} = ?")
                          update_values.append(col_val_dict[col])
 
@@ -462,7 +446,7 @@ class TransactionsCRUD(GenericCRUD):
                 query = f"UPDATE {self.table_name} SET {set_clause} WHERE id = ?"
                 final_values = update_values + [record_id]
 
-            # --- INSERT Logic ---
+            # --- INSERT Logic (Set source_type to 'GENERAL') ---
             else:
                 insert_columns = []
                 insert_values = []
@@ -470,9 +454,15 @@ class TransactionsCRUD(GenericCRUD):
 
                 for col in columns:
                     col_lower = col.lower()
+                    # Only include columns that exist in the table (excluding id)
                     if col_lower in db_cols_lower_set and col_lower != 'id':
                         insert_columns.append(col)
                         insert_values.append(col_val_dict[col])
+
+                # **** Add source_type explicitly for INSERT ****
+                if 'source_type' in db_cols_lower_set and 'source_type' not in [c.lower() for c in insert_columns]:
+                    insert_columns.append('source_type')
+                    insert_values.append('GENERAL') # Default source for manual/template adds
 
                 current_time = sqlite3.Timestamp.now()
                 if 'created_at' in db_cols_lower_set and 'created_at' not in [c.lower() for c in insert_columns]:
@@ -486,11 +476,12 @@ class TransactionsCRUD(GenericCRUD):
                 query = f"INSERT INTO {self.table_name} ({', '.join(insert_columns)}) VALUES ({placeholders})"
                 final_values = insert_values
 
-            # --- 6. Execute SQL and Update Balances ---
-            print(f"Executing Query: {query}")
-            print(f"With Values: {final_values}")
+            # --- 6. Execute SQL and Update Balances (new impact) ---
+            print(f"Executing Query: {query}") # Debugging
+            print(f"With Values: {final_values}") # Debugging
             self.cursor.execute(query, final_values)
 
+            # Apply new balance impact
             if debited_account_id is not None:
                  self._update_account_balance(debited_account_id, amount, 'add')
             if credited_account_id is not None:
@@ -515,12 +506,12 @@ class TransactionsCRUD(GenericCRUD):
 
     # --- edit method ---
     def edit(self, main_window):
-        """Opens a search dialog to select a transaction, then opens the edit dialog."""
+        """Opens search, checks source_type, then opens edit dialog ONLY if source is 'GENERAL'."""
         search_dialog = AdvancedSearchDialog(
             field_type='generic',
             parent=main_window,
             db_path=self.db_path,
-            table_name=self.table_name # Search transactions
+            table_name=self.table_name # Search transactions table
         )
         if search_dialog.exec() == QDialog.Accepted:
             selected_item = search_dialog.get_selected_item()
@@ -534,26 +525,43 @@ class TransactionsCRUD(GenericCRUD):
                  return
 
             try:
+                # Fetch the full record, *including* source_type for the check
                 temp_cursor = self.conn.cursor()
                 temp_cursor.row_factory = sqlite3.Row
-                temp_cursor.execute(f"SELECT * FROM {self.table_name} WHERE id = ?", (record_id,))
+                # Select all columns plus source_type explicitly if needed, though '*' should include it
+                temp_cursor.execute(f"SELECT *, source_type FROM {self.table_name} WHERE id = ?", (record_id,))
                 record_row = temp_cursor.fetchone()
 
                 if not record_row:
                     QMessageBox.warning(main_window, "Error", f"Record with ID {record_id} not found!")
                     return
 
-                columns = self.get_columns()
+                # **** CHECK SOURCE TYPE BEFORE PROCEEDING ****
+                source_type = record_row['source_type']
+                if source_type != 'GENERAL':
+                    QMessageBox.warning(
+                        main_window,
+                        "Edit Restricted",
+                        f"This transaction originated from the '{source_type}' module. "
+                        f"It cannot be edited from the general transaction menu.\n\n"
+                        f"Please use the specific module (AR/AP or Fixed Assets) to modify it."
+                    )
+                    return # Stop the edit process here
+
+                # --- Proceed with edit dialog only if source_type is 'GENERAL' ---
+                columns = self.get_columns() # Get column names for dialog creation
 
                 dialog = QDialog(main_window)
-                dialog.setWindowTitle(f"Edit Transaction (ID: {record_id})")
+                dialog.setWindowTitle(f"Edit General Transaction (ID: {record_id})")
                 dialog.setMinimumWidth(450)
                 layout = QVBoxLayout(dialog)
 
+                # Create input fields, pre-filling with data from record_row
                 inputs = self._create_input_fields(columns, dialog, record_row)
 
                 button_layout = QHBoxLayout()
                 save_button = QPushButton("Save Changes")
+                # Connect save to _save_record, passing update=True and record_id
                 save_button.clicked.connect(lambda: self._save_record(dialog, inputs, update=True, record_id=record_id))
                 cancel_button = QPushButton("Cancel")
                 cancel_button.clicked.connect(dialog.reject)
@@ -562,24 +570,22 @@ class TransactionsCRUD(GenericCRUD):
                 button_layout.addWidget(cancel_button)
                 layout.addLayout(button_layout)
 
-                dialog.exec()
+                dialog.exec() # Show the edit dialog
 
             except sqlite3.Error as e:
                  QMessageBox.critical(main_window, "Database Error", f"Error preparing edit dialog: {str(e)}")
-            except ValueError as e:
-                 QMessageBox.critical(main_window, "Configuration Error", str(e))
             except Exception as e:
                  QMessageBox.critical(main_window, "Error", f"An unexpected error occurred setting up the edit dialog: {str(e)}")
 
 
     # --- delete method ---
     def delete(self, main_window):
-        """Opens search, confirms, deletes transaction, and reverses balance impacts."""
+        """Opens search, confirms, checks source_type, then deletes transaction ONLY if source is 'GENERAL'."""
         search_dialog = AdvancedSearchDialog(
             field_type='generic',
             parent=main_window,
             db_path=self.db_path,
-            table_name=self.table_name # Search transactions
+            table_name=self.table_name # Search transactions table
         )
 
         if search_dialog.exec() == QDialog.Accepted:
@@ -594,18 +600,41 @@ class TransactionsCRUD(GenericCRUD):
                  return
 
             description_info = ""
+            source_type = None # Variable to store the source type
             try:
-                 self.cursor.execute("SELECT description, date, amount FROM transactions WHERE id = ?", (record_id,))
-                 desc_data = self.cursor.fetchone()
-                 if desc_data:
-                      desc_text = desc_data['description'] or 'N/A'
+                 # Fetch details for confirmation AND source_type for the check
+                 self.cursor.row_factory = sqlite3.Row # Ensure row factory is set for this cursor too
+                 self.cursor.execute("SELECT description, date, amount, source_type FROM transactions WHERE id = ?", (record_id,))
+                 trans_data = self.cursor.fetchone()
+                 if trans_data:
+                      source_type = trans_data['source_type'] # <<< Get the source type
+                      desc_text = trans_data['description'] or 'N/A'
                       if len(desc_text) > 80: desc_text = desc_text[:77] + "..."
-                      # Format amount only for the confirmation display
-                      amount_formatted = "{:,.2f}".format(float(desc_data['amount'])) if desc_data['amount'] is not None else 'N/A'
-                      description_info = f"\nDescription: {desc_text}\nDate: {desc_data['date']}\nAmount: {amount_formatted}"
-            except (sqlite3.Error, ValueError, TypeError) as e:
-                 print(f"Error fetching/formatting details for delete confirmation (ID: {record_id}): {e}")
+                      amount_formatted = "{:,.2f}".format(float(trans_data['amount'])) if trans_data['amount'] is not None else 'N/A'
+                      # Include source type in the confirmation message details
+                      description_info = (f"\nDescription: {desc_text}\nDate: {trans_data['date']}\nAmount: {amount_formatted}"
+                                          f"\nSource: {source_type}")
+                 else:
+                     QMessageBox.warning(main_window, "Not Found", f"Transaction ID {record_id} not found for deletion.")
+                     return # Stop if transaction doesn't exist
 
+            except (sqlite3.Error, ValueError, TypeError) as e:
+                 print(f"Error fetching details/source_type for delete confirmation (ID: {record_id}): {e}")
+                 QMessageBox.critical(main_window, "Error", "Could not fetch transaction details for deletion.")
+                 return
+
+            # **** CHECK SOURCE TYPE BEFORE CONFIRMATION DIALOG ****
+            if source_type != 'GENERAL':
+                QMessageBox.warning(
+                    main_window,
+                    "Deletion Restricted",
+                    f"This transaction originated from the '{source_type}' module. "
+                    f"It cannot be deleted from the general transaction menu.\n\n"
+                    f"Please use the specific module (AR/AP or Fixed Assets) to delete it."
+                )
+                return # Stop the delete process here
+
+            # --- Proceed with confirmation only if source_type is 'GENERAL' ---
             confirm_msg = (f"Are you sure you want to delete transaction ID {record_id}?{description_info}\n\n"
                            "WARNING: This will PERMANENTLY delete the record and reverse its impact on account balances.")
             confirm = QMessageBox.question(main_window, "Confirm Delete", confirm_msg,
@@ -614,11 +643,13 @@ class TransactionsCRUD(GenericCRUD):
 
             if confirm == QMessageBox.StandardButton.Yes:
                 try:
+                    # Start DB transaction for atomicity
                     self.cursor.execute("BEGIN")
 
+                    # Re-fetch balance details right before deletion (source_type already confirmed as GENERAL)
                     self.cursor.execute("SELECT debited, credited, amount FROM transactions WHERE id = ?", (record_id,))
                     original_data = self.cursor.fetchone()
-                    if not original_data:
+                    if not original_data: # Check if it was deleted between confirmation and now
                         self.conn.rollback()
                         QMessageBox.warning(main_window, "Not Found", f"Transaction ID {record_id} no longer exists.")
                         return
@@ -627,24 +658,30 @@ class TransactionsCRUD(GenericCRUD):
                     original_credited = original_data['credited']
                     original_amount = original_data['amount']
 
+                    # Reverse balance impacts
                     if original_debited is not None and original_amount is not None:
                         self._update_account_balance(original_debited, original_amount, 'subtract')
                     if original_credited is not None and original_amount is not None:
                         self._update_account_balance(original_credited, original_amount, 'add')
 
+                    # Delete the transaction record
                     delete_count = self.cursor.execute(f"DELETE FROM {self.table_name} WHERE id = ?", (record_id,)).rowcount
 
-                    if delete_count == 0:
+                    if delete_count == 0: # Should not happen if fetch worked, but good check
                          self.conn.rollback()
-                         QMessageBox.warning(main_window, "Deletion Failed", f"Transaction ID {record_id} could not be deleted. Balances reverted.")
+                         QMessageBox.warning(main_window, "Deletion Failed", f"Transaction ID {record_id} could not be deleted (already gone?). Balances reverted.")
                     else:
+                        # Commit the changes (deletion and balance updates)
                         self.conn.commit()
                         QMessageBox.information(main_window, "Success", f"Transaction ID {record_id} deleted and balances updated.")
+                        # Refresh logic (optional but recommended)
                         current_widget = main_window.centralWidget()
                         if isinstance(current_widget, QTableWidget) and current_widget.objectName() == "transactionsViewTable":
-                             QMessageBox.information(main_window, "Refresh Recommended", "Transaction deleted. Please 'View Transactions' again or use the filter/refresh button.")
+                             # Suggest refresh instead of trying to auto-refresh complex filtered views
+                             QMessageBox.information(main_window, "Refresh Recommended", "Transaction deleted. Please 'View Transactions' again or use the filter/refresh button if available.")
 
                 except (sqlite3.Error, ValueError, TypeError) as e:
+                    # Rollback on any error during the delete process
                     self.conn.rollback()
                     error_msg = f"Failed to delete transaction ID {record_id}: {str(e)}"
                     print(f"ERROR during delete: {error_msg}")

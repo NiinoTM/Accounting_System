@@ -171,8 +171,8 @@ class RecordLiabilitySettlementWindow(QWidget):
 
                 # --- 4. Insert into transactions table ---
                 db.cursor.execute(
-                    "INSERT INTO transactions (date, description, debited, credited, amount) VALUES (?, ?, ?, ?, ?)",
-                    (date, details, ap_account_id, asset_id, amount)  # AP is debited, Asset is credited
+                    "INSERT INTO transactions (date, description, debited, credited, amount, source_type) VALUES (?, ?, ?, ?, ?, ?)",
+                    (date, details, ap_account_id, asset_id, amount, 'DEBTOR_CREDITOR')  # AP is debited, Asset is credited
                 )
 
                 # --- 5. Update Account Balances ---

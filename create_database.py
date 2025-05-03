@@ -105,7 +105,9 @@ class DatabaseManager:
             amount DECIMAL(15, 2),
             debtor_creditor INTEGER NOT NULL,
             type VARCHAR(20) NOT NULL,  -- Added 'type' column
-            FOREIGN KEY (debtor_creditor) REFERENCES debtor_creditor(id)
+            transaction_id INTEGER, -- Link back to the main transaction
+            FOREIGN KEY (debtor_creditor) REFERENCES debtor_creditor(id),
+            FOREIGN KEY (transaction_id) REFERENCES transactions(id) -- Optional: Link to the transaction table
         );
 
         -- Fixed Assets Table (Modified - Removed calculated fields)
@@ -142,7 +144,7 @@ class DatabaseManager:
             FOREIGN KEY (transaction_id) REFERENCES transactions(id)
         );
 
-        -- Transactions
+        -- Transactions (Modified: Added source_type)
         CREATE TABLE IF NOT EXISTS transactions (
             id INTEGER PRIMARY KEY,
             date TEXT NOT NULL,
@@ -150,6 +152,7 @@ class DatabaseManager:
             debited INTEGER NOT NULL,
             credited INTEGER NOT NULL,
             amount REAL NOT NULL,
+            source_type TEXT DEFAULT 'GENERAL' NOT NULL CHECK (source_type IN ('GENERAL', 'DEBTOR_CREDITOR', 'FIXED_ASSET')), -- Added source tracking
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (debited) REFERENCES accounts(id),
@@ -186,7 +189,7 @@ class DatabaseManager:
         CREATE TABLE IF NOT EXISTS template_transaction_details (
             id INTEGER PRIMARY KEY,
             template_transaction_id INTEGER NOT NULL,
-            debited INTEGER NOT NULL,  
+            debited INTEGER NOT NULL,
             credited INTEGER NOT NULL,
             amount REAL NOT NULL,
             FOREIGN KEY (template_transaction_id) REFERENCES template_transactions(id) ON DELETE CASCADE,
