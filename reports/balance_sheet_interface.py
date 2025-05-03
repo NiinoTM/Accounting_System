@@ -1,3 +1,5 @@
+# --- START OF FILE balance_sheet_interface.py ---
+
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton,
                               QMessageBox, QHBoxLayout, QScrollArea)
 from PySide6.QtCore import Qt
@@ -6,6 +8,11 @@ from utils.crud.generic_crud import GenericCRUD
 from utils.formatters import format_table_name
 from .income_statement_core import generate_income_statement_data
 from PySide6.QtGui import QPalette, QColor
+
+# Define a small epsilon for zero comparison (half a cent)
+ZERO_THRESHOLD = 0.005
+# Define a smaller threshold for display formatting zero check
+DISPLAY_ZERO_THRESHOLD = 0.0001
 
 class BalanceSheetWindow(QWidget):
     def __init__(self, main_window):
@@ -66,17 +73,17 @@ class BalanceSheetWindow(QWidget):
         self.header = QWidget()
         header_layout = QVBoxLayout(self.header)
         header_layout.setSpacing(5)
-        
+
         title = QLabel("BALANCE SHEET")
         title.setStyleSheet("""
             font-size: 24px;
             font-weight: bold;
         """)
         title.setAlignment(Qt.AlignCenter)
-        
+
         self.date_display = QLabel("As of --/--/----")
         self.date_display.setAlignment(Qt.AlignCenter)
-        
+
         header_layout.addWidget(title)
         header_layout.addWidget(self.date_display)
         self.layout.addWidget(self.header)
@@ -123,7 +130,7 @@ class BalanceSheetWindow(QWidget):
 
         totals_layout.addWidget(self.total_assets_label)
         totals_layout.addWidget(self.total_liab_equity_label)
-        
+
         self.layout.addWidget(totals)
         self.apply_styles()
 
@@ -132,7 +139,7 @@ class BalanceSheetWindow(QWidget):
         column = QWidget()
         layout = QVBoxLayout(column)
         layout.setSpacing(15)
-        
+
         title_label = QLabel(title)
         title_label.setStyleSheet("""
             font-size: 18px;
@@ -148,7 +155,7 @@ class BalanceSheetWindow(QWidget):
         section = QWidget()
         layout = QVBoxLayout(section)
         layout.setSpacing(10)
-        
+
         title_label = QLabel(title)
         title_label.setStyleSheet("""
             font-size: 14px;
@@ -189,56 +196,87 @@ class BalanceSheetWindow(QWidget):
             }
         """)
 
-
+    # --- CORRECTED FORMATTING LOGIC ---
     def format_amount(self, amount, is_right_side=False):
         """
-        Format amount based on side of balance sheet and sign
-        is_right_side: True for Liabilities & Equity, False for Assets
+        Formats amount for display.
+        - Uses parentheses for negative/contra balances.
+        - Rounds to 2 decimal places for display.
+        - Treats values very close to 0 as $ 0.00.
+        - is_right_side: True for Liabilities & Equity, False for Assets.
+                         Affects interpretation of positive/negative amount.
         """
+        # Treat amounts very close to zero as exactly zero for display
+        if abs(amount) < DISPLAY_ZERO_THRESHOLD:
+            return "$ 0.00"
+
+        # Round the non-zero amount for display
+        rounded_amount = round(amount, 2)
+        # Check again after rounding, as rounding could result in 0.00
+        if abs(rounded_amount) < DISPLAY_ZERO_THRESHOLD:
+             return "$ 0.00"
+
         if is_right_side:
-            # For right side (Liabilities & Equity), negative becomes positive
-            display_amount = -amount if amount < 0 else amount
-            sign = "" if amount < 0 else "-"
-        else:
-            # For left side (Assets), keep original sign
-            display_amount = abs(amount)
-            sign = "-" if amount < 0 else ""
-            
-        return f"$ {sign}{display_amount:.2f}"
-    
+            # L&E side:
+            # Core calculation returns negative for normal credits.
+            # We display normal credits as positive numbers.
+            # We display abnormal debits (positive from core) in parentheses.
+            if rounded_amount < 0: # Normal credit balance
+                display_val = abs(rounded_amount)
+                return f"$ {display_val:.2f}"
+            else: # Abnormal debit balance (or exact zero, handled above)
+                display_val = rounded_amount
+                return f"$ ({display_val:.2f})"
+        else: # Assets side:
+            # Core calculation returns positive for normal debits.
+            # We display normal debits as positive numbers.
+            # We display abnormal credits (negative from core) in parentheses.
+            if rounded_amount > 0: # Normal debit balance
+                display_val = rounded_amount
+                return f"$ {display_val:.2f}"
+            else: # Abnormal credit balance (or exact zero, handled above)
+                display_val = abs(rounded_amount)
+                return f"$ ({display_val:.2f})"
+    # --- END OF CORRECTED FORMATTING LOGIC ---
+
     def add_line_item(self, section, name, amount, is_right_side=False):
-        """Add a line item to a section if amount is not zero"""
-        if amount == 0:
-            return 0
-            
+        """Add a line item to a section only if amount is not effectively zero."""
+        # --- Check against the threshold FOR HIDING ---
+        if abs(amount) < ZERO_THRESHOLD:
+            return 0 # Return 0 so it doesn't affect sums, but don't display
+
+        # --- Proceed only if amount is significant enough to display ---
         item = QWidget()
         layout = QHBoxLayout(item)
         layout.setContentsMargins(0, 5, 0, 5)
-        
+
         name_label = QLabel(format_table_name(name))
+        # --- Use the corrected formatter ---
         formatted_amount = self.format_amount(amount, is_right_side)
         amount_label = QLabel(formatted_amount)
         amount_label.setAlignment(Qt.AlignRight)
         amount_label.setStyleSheet("font-family: 'Consolas', monospace;")
-        
+
         layout.addWidget(name_label)
         layout.addStretch()
         layout.addWidget(amount_label)
-        
+
         section.layout().addWidget(item)
-        return amount  # Return actual amount, not abs
+        # Return the ORIGINAL amount for accurate summation
+        return amount
 
     def add_subtotal(self, section, text, amount, is_right_side=False):
         """Add a subtotal line to a section"""
         item = QWidget()
         layout = QHBoxLayout(item)
         layout.setContentsMargins(0, 10, 0, 5)
-        
+
         text_label = QLabel(text)
+        # --- Use the corrected formatter for subtotal display ---
         formatted_amount = self.format_amount(amount, is_right_side)
         amount_label = QLabel(formatted_amount)
         amount_label.setAlignment(Qt.AlignRight)
-        
+
         text_label.setStyleSheet("""
             font-weight: bold;
             border-top: 1px solid #bdc3c7;
@@ -250,11 +288,11 @@ class BalanceSheetWindow(QWidget):
             border-top: 1px solid #bdc3c7;
             padding-top: 5px;
         """)
-        
+
         layout.addWidget(text_label)
         layout.addStretch()
         layout.addWidget(amount_label)
-        
+
         section.layout().addWidget(item)
 
     def select_period(self):
@@ -274,6 +312,7 @@ class BalanceSheetWindow(QWidget):
             QMessageBox.warning(self, "Error", "Please select an accounting period.")
             return
 
+        balance_sheet = None # Initialize to ensure close_connection runs
         try:
             # Get balance sheet data
             balance_sheet = BalanceSheet()
@@ -289,83 +328,76 @@ class BalanceSheetWindow(QWidget):
             for section in [self.current_assets_section, self.fixed_assets_section,
                         self.current_liab_section, self.noncurrent_liab_section,
                         self.equity_section]:
-                while section.layout().count() > 1:  # Keep the title
-                    item = section.layout().takeAt(1)
-                    if item.widget():
-                        item.widget().deleteLater()
+                layout = section.layout()
+                while layout.count() > 1: # Keep the title label (at index 0)
+                    item = layout.takeAt(1)
+                    widget = item.widget()
+                    if widget:
+                        widget.deleteLater()
 
+            # --- Calculations use raw amounts returned by add_line_item ---
             # Add new content - Assets (left side)
-            total_current_assets = sum(self.add_line_item(self.current_assets_section, 
-                                                        item['name'], 
+            total_current_assets = sum(self.add_line_item(self.current_assets_section,
+                                                        item['name'],
                                                         item['balance'],
                                                         is_right_side=False)
                                     for item in ativos_circulantes)
-            if total_current_assets != 0:
-                self.add_subtotal(self.current_assets_section, "Total Current Assets", 
-                                total_current_assets, is_right_side=False)
+            self.add_subtotal(self.current_assets_section, "Total Current Assets",
+                            total_current_assets, is_right_side=False)
 
-            total_fixed_assets = sum(self.add_line_item(self.fixed_assets_section, 
-                                                    item['name'], 
+            total_fixed_assets = sum(self.add_line_item(self.fixed_assets_section,
+                                                    item['name'],
                                                     item['balance'],
                                                     is_right_side=False)
                                 for item in ativos_fixos)
-            if total_fixed_assets != 0:
-                self.add_subtotal(self.fixed_assets_section, "Total Fixed Assets", 
-                                total_fixed_assets, is_right_side=False)
+            self.add_subtotal(self.fixed_assets_section, "Total Fixed Assets",
+                            total_fixed_assets, is_right_side=False)
 
             # Add new content - Liabilities (right side)
-            total_current_liab = sum(self.add_line_item(self.current_liab_section, 
-                                                    item['name'], 
+            total_current_liab = sum(self.add_line_item(self.current_liab_section,
+                                                    item['name'],
                                                     item['balance'],
                                                     is_right_side=True)
                                 for item in passivos_circulantes)
-            if total_current_liab != 0:
-                self.add_subtotal(self.current_liab_section, "Total Current Liabilities", 
-                                total_current_liab, is_right_side=True)
+            self.add_subtotal(self.current_liab_section, "Total Current Liabilities",
+                            total_current_liab, is_right_side=True)
 
-            total_noncurrent_liab = sum(self.add_line_item(self.noncurrent_liab_section, 
-                                                        item['name'], 
+            total_noncurrent_liab = sum(self.add_line_item(self.noncurrent_liab_section,
+                                                        item['name'],
                                                         item['balance'],
                                                         is_right_side=True)
                                     for item in passivos_nao_circulantes)
-            if total_noncurrent_liab != 0:
-                self.add_subtotal(self.noncurrent_liab_section, "Total Non-Current Liabilities", 
-                                total_noncurrent_liab, is_right_side=True)
+            self.add_subtotal(self.noncurrent_liab_section, "Total Non-Current Liabilities",
+                            total_noncurrent_liab, is_right_side=True)
 
             # Add equity items (right side)
-            total_equity = sum(self.add_line_item(self.equity_section, 
-                                                item['name'], 
+            total_equity_base = sum(self.add_line_item(self.equity_section,
+                                                item['name'],
                                                 item['balance'],
                                                 is_right_side=True)
                             for item in patrimonio)
-            
-            # Add net income/loss to equity section if not zero
-            if net_income != 0:
-                # Display the income with proper sign for the right side (liabilities & equity)
-                # For right side display, we negate the value
-                income_display_value = -net_income
-                
-                # Add the line item with the display value
-                self.add_line_item(self.equity_section, 
-                                "Net Income" if net_income >= 0 else "Net Loss", 
-                                income_display_value,
-                                is_right_side=True)
-                
-                # For calculation purposes:
-                # - Positive net_income should make equity more positive (or less negative)
-                # - Negative net_income (loss) should make equity more negative
-                # Since income_display_value is already negated, we add it directly
-                total_equity += income_display_value
 
-            if total_equity != 0:
-                self.add_subtotal(self.equity_section, "Total Equity", 
-                                total_equity, is_right_side=True)
+            # Add net income/loss to equity section
+            # The amount passed to add_line_item for Net Income needs to follow
+            # the convention: positive income increases equity (decreases the negative raw balance),
+            # negative loss decreases equity (increases the negative raw balance).
+            # So, we pass the *negative* of net_income to represent its effect on the L&E side balance.
+            net_income_effect_on_balance = -net_income
+            self.add_line_item(self.equity_section,
+                            "Net Income" if net_income >= 0 else "Net Loss",
+                            net_income_effect_on_balance, # Pass the balance-affecting value
+                            is_right_side=True)
 
-            # Update totals
+            # Calculate final total equity (raw balance sum)
+            total_equity = total_equity_base + net_income_effect_on_balance
+            self.add_subtotal(self.equity_section, "Total Equity",
+                            total_equity, is_right_side=True)
+
+            # Update totals (raw balance sums)
             total_assets = total_current_assets + total_fixed_assets
             total_liab_equity = total_current_liab + total_noncurrent_liab + total_equity
 
-            # Update total labels with proper sign formatting
+            # --- Update total labels using the corrected formatter ---
             self.total_assets_label.setText(f"TOTAL ASSETS: {self.format_amount(total_assets, is_right_side=False)}")
             self.total_liab_equity_label.setText(
                 f"TOTAL LIABILITIES & EQUITY: {self.format_amount(total_liab_equity, is_right_side=True)}")
@@ -373,7 +405,10 @@ class BalanceSheetWindow(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to generate report: {e}")
         finally:
-            balance_sheet.close_connection()
+            if balance_sheet:
+                 balance_sheet.close_connection()
 
     def show_report_on_main_window(self):
         self.main_window.setCentralWidget(self)
+
+# --- END OF FILE balance_sheet_interface.py ---
